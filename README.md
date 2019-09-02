@@ -76,7 +76,7 @@ doesn’t help here.
 library (moveability)
 data_dir <- "/data/data/moveability/accra"
 m <- readRDS (file.path (data_dir, "accra-moveability.Rds"))
-popdens <- readRDS ("/data/mega/code/repos/atfutures/who-data/accra/osm/popdens_nodes.Rds")
+popdens <- readRDS ("<...>/who-data/accra/osm/popdens_nodes.Rds")
 popdens <- popdens [popdens$osm_id %in% m$id, ]
 m$popdens <- NA
 m$popdens [match (popdens$osm_id, m$id)] <- popdens$pop
