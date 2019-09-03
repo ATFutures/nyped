@@ -1,6 +1,6 @@
 Package: calibration
 Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
+Version: 0.0.0.001
 Authors@R: 
     person(given = "Mark",
            family = "Padgham",
@@ -15,7 +15,9 @@ Imports:
     dplyr,
     magrittr,
     osmdata,
-    sf
+    rvest,
+    sf,
+    xml2
 Suggests: 
     testthat
 RoxygenNote: 6.1.1
