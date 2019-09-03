@@ -71,7 +71,7 @@ read_ridership <- function ()
     # Then put the line information in a different column
     stations <- x [, 1]
     # remove funny terminal characters arising in some stations:
-    stations <- gsub ("Â", "", stations)
+    #stations <- gsub ("Â", "", stations)
     # Some station locations share 2 names, but only one is needed, so remove 2nd:
     stations <- gsub ("|\\/.*", "", stations)
     # concatenate all line IDs
@@ -109,11 +109,11 @@ match_counts_to_stns <- function (counts, xy)
     xy$NAME <- gsub("(\\d)(st|nd|rd|th)\\b", "\\1", xy$NAME)
     xy$NAME <- gsub ("\\s-\\s", "-", xy$NAME)
     xy$NAME <- gsub ("Av-", "Ave-", xy$NAME)
-    x$Station <- gsub ("Av-", "Ave-", x$Station)
+    counts$Station <- gsub ("Av-", "Ave-", counts$Station)
     xy$NAME <- gsub ("Av$", "Ave", xy$NAME)
-    x$Station <- gsub ("Av$", "Ave", x$Station)
+    counts$Station <- gsub ("Av$", "Ave", counts$Station)
     xy$NAME <- gsub ("Avs", "Aves", xy$NAME)
-    x$Station <- gsub ("Avs", "Aves", x$Station)
+    counts$Station <- gsub ("Avs", "Aves", counts$Station)
 
     xy$NAME <- gsub ("(E)\\s+([1-9])", "East \\2", xy$NAME)
     xy$NAME <- gsub ("(N)\\s+([1-9])", "North \\2", xy$NAME)
@@ -128,53 +128,53 @@ match_counts_to_stns <- function (counts, xy)
 
     xy$NAME <- gsub ("Plz", "Plaza", xy$NAME)
     xy$NAME <- gsub ("Ctr", "Center", xy$NAME)
-    x$Station <- gsub ("Ctr", "Center", x$Station)
+    counts$Station <- gsub ("Ctr", "Center", counts$Station)
     xy$NAME <- gsub ("'s\\s", "s ", xy$NAME)
-    x$Station <- gsub ("'s\\s", "s ", x$Station)
+    counts$Station <- gsub ("'s\\s", "s ", counts$Station)
     xy$NAME <- gsub ("Pky|Pkwy", "Parkway", xy$NAME)
-    x$Station <- gsub ("Pky|Pkwy", "Parkway", x$Station)
+    counts$Station <- gsub ("Pky|Pkwy", "Parkway", counts$Station)
     xy$NAME <- gsub ("Hts", "Heights", xy$NAME)
-    x$Station <- gsub ("Hts", "Heights", x$Station)
+    counts$Station <- gsub ("Hts", "Heights", counts$Station)
     xy$NAME <- gsub ("Bklyn", "Brooklyn", xy$NAME)
-    x$Station <- gsub ("Bklyn", "Brooklyn", x$Station)
+    counts$Station <- gsub ("Bklyn", "Brooklyn", counts$Station)
     xy$NAME <- gsub ("Ft", "Fort", xy$NAME)
-    x$Station <- gsub ("Ft", "Fort", x$Station)
+    counts$Station <- gsub ("Ft", "Fort", counts$Station)
     xy$NAME <- gsub ("Rd", "Road", xy$NAME)
-    x$Station <- gsub ("Rd", "Road", x$Station)
+    counts$Station <- gsub ("Rd", "Road", counts$Station)
     xy$NAME <- gsub ("NY", "New York", xy$NAME)
-    x$Station <- gsub ("NY", "New York", x$Station)
+    counts$Station <- gsub ("NY", "New York", counts$Station)
     xy$NAME <- gsub ("Pl$", "Place", xy$NAME)
-    x$Station <- gsub ("Pl$", "Place", x$Station)
+    counts$Station <- gsub ("Pl$", "Place", counts$Station)
     xy$NAME <- gsub ("Tpke", "Turnpike", xy$NAME)
-    x$Station <- gsub ("Tpke", "Turnpike", x$Station)
+    counts$Station <- gsub ("Tpke", "Turnpike", counts$Station)
 
     # This is a typo:
-    x$Station <- gsub ("Beverley", "Beverly", x$Station)
+    counts$Station <- gsub ("Beverley", "Beverly", counts$Station)
     # And these have to be custom-matched:
     s <- c ("Bushwick", "Flatbush", "Union Sq", "Herald Sq", "^81 St", "Cathedral",
             "Central Park North", "^33 St", "^39 Ave", "^40 St", "^46 St",
             "^75 St-", "Beach 67 St", "Jamaica Center", "Sutphin Blvd-Archer Ave",
             "Newkirk")
     for (i in s)
-        xy$NAME [grep (i, xy$NAME)] <- x$Station [grep (i, x$Station)]
+        xy$NAME [grep (i, xy$NAME)] <- counts$Station [grep (i, counts$Station)]
 
     xy$NAME [grepl ("^57 St", xy$NAME) & xy$LINE == "F"] <- 
-        x$Station [grepl ("^57 St", x$Station) & x$ids == "F"] <-
+        counts$Station [grepl ("^57 St", counts$Station) & counts$ids == "F"] <-
             "57 St F"
     xy [grepl ("^57 St", xy$NAME), ]
     xy$NAME [grepl ("^57 St", xy$NAME) & grepl ("N", xy$LINE)] <- 
-        x$Station [grepl ("^57 St", x$Station) & x$ids == "N,Q,R,W"] <-
+        counts$Station [grepl ("^57 St", counts$Station) & counts$ids == "N,Q,R,W"] <-
             "57 St NQRW"
 
     xy$NAME [grep ("New YorkU", xy$NAME)] <-
-        x$Station [grep ("New York University", x$Station)]
-    x$Station [grep ("WTC", x$Station)] <- "World Trade Center"
-    x$Station [grep ("^74", x$Station)] <- xy$NAME [grep ("^74 St", xy$NAME)]
+        counts$Station [grep ("New York University", counts$Station)]
+    counts$Station [grep ("WTC", counts$Station)] <- "World Trade Center"
+    counts$Station [grep ("^74", counts$Station)] <- xy$NAME [grep ("^74 St", xy$NAME)]
 
     xy$LINE <- gsub (" Express|Express-", "", xy$LINE)
     xy$LINE <- gsub ("-", "", xy$LINE)
 
-    index <- apply (x, 1, function (i) {
+    index <- apply (counts, 1, function (i) {
         index <- grep (i [1], xy$NAME)
         if (length (index) == 0)
             return (NA)
@@ -191,17 +191,17 @@ match_counts_to_stns <- function (counts, xy)
     length (which (is.na (index))) # 136 -> 111 -> 1
     index2 <- which (is.na (index))
     i <- index2 [1]
-    x$Station [i]
+    counts$Station [i]
     xy$NAME [index [i]]
 
 
-    data.frame (name = x$Station,
-                count2013 = x$X2013,
-                count2014 = x$X2014,
-                count2015 = x$X2015,
-                count2016 = x$X2016,
-                count2017 = x$X2017,
-                count2018 = x$X2018,
+    data.frame (name = counts$Station,
+                count2013 = counts$X2013,
+                count2014 = counts$X2014,
+                count2015 = counts$X2015,
+                count2016 = counts$X2016,
+                count2017 = counts$X2017,
+                count2018 = counts$X2018,
                 geom = xy$the_geom [index],
                 stringsAsFactors = FALSE)
 }
