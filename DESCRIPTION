@@ -13,9 +13,11 @@ Encoding: UTF-8
 LazyData: true
 Imports:
     cli,
+    dodgr,
     dplyr,
     magrittr,
     osmdata,
+    raster,
     rvest,
     sf,
     xml2
