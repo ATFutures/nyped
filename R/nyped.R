@@ -14,6 +14,10 @@
 #' @export
 nyped_data <- function (data_dir = tempdir ())
 {
+    # pedestrian count data from
+    # https://www1.nyc.gov/html/dot/html/about/datafeeds.shtml#Pedestrians
+    # counts are weekdays ("\_D") with "\_AM" and "\_PM" counts, and weekends
+    # ("\_D2") with single counts ("\_MD")
     message (cli::rule (left = "calibration", line = 2, col = "green"))
     check_ped_file (data_dir)
     files <- load_ped_file (data_dir)

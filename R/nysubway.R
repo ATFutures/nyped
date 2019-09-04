@@ -28,6 +28,7 @@ dl_ridership <- function ()
              appendLF = FALSE)
     message ("\r", cli::symbol$tick, " Downloaded ridership data  ")
 
+    # http://web.mta.info/nyct/facts/ridership/#chart_s
     u <- "http://web.mta.info/nyct/facts/ridership/ridership_sub_annual.htm"
     x <- xml2::read_html (u)
     xml2::write_xml (x, file.path (tempdir (), "junk.html"))
@@ -113,6 +114,7 @@ dl_locations <- function ()
 {
     message (cli::symbol$pointer, " Downloading station location data",
              appendLF = FALSE)
+    # https://data.cityofnewyork.us/Transportation/Subway-Stations/arq3-7z49
     u <- "https://data.cityofnewyork.us/api/views/kk4q-3rt2/rows.csv?accessType=DOWNLOAD"
     check <- utils::download.file (url = u, quiet = TRUE,
                                    destfile = file.path (tempdir (),
