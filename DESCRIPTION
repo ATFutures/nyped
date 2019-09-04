@@ -23,5 +23,7 @@ Imports:
     sf,
     xml2
 Suggests: 
+    mapdeck,
+    mapview,
     testthat
 RoxygenNote: 6.1.1

@@ -23,21 +23,28 @@ nysubway_data <- function ()
 
 dl_ridership <- function ()
 {
-    message (cli::rule (left = "calibration", line = 2, col = "green"))
-    message (cli::symbol$pointer, " Downloading ridership data",
-             appendLF = FALSE)
-    message ("\r", cli::symbol$tick, " Downloaded ridership data  ")
+    f <- file.path (tempdir (), "ridership.html")
+    if (!file.exists (f))
+    {
+        message (cli::rule (left = "calibration", line = 2, col = "green"))
+        message (cli::symbol$pointer, " Downloading ridership data",
+                 appendLF = FALSE)
 
-    # http://web.mta.info/nyct/facts/ridership/#chart_s
-    u <- "http://web.mta.info/nyct/facts/ridership/ridership_sub_annual.htm"
-    x <- xml2::read_html (u)
-    xml2::write_xml (x, file.path (tempdir (), "junk.html"))
+        # http://web.mta.info/nyct/facts/ridership/#chart_s
+        u <- "http://web.mta.info/nyct/facts/ridership/ridership_sub_annual.htm"
+        x <- xml2::read_html (u)
+        xml2::write_xml (x, file.path (tempdir (), "ridership.html"))
+        message ("\r", cli::symbol$tick, " Downloaded ridership data  ")
+    } else
+    {
+        message (cli::symbol$tick, " Ridership data already downloaded ")
+    }
 }
 
 # strip the raw ridership data down to main table
 strip_to_table <- function ()
 {
-    x <- readLines (file.path (tempdir (), "junk.html"))
+    x <- readLines (file.path (tempdir (), "ridership.html"))
     lstart <- grep ("<table id=\"subway\"", x)
     n <- which (grep ("<table", x) == lstart)
     lend <- grep ("</table>", x)
@@ -112,19 +119,24 @@ read_ridership <- function ()
 
 dl_locations <- function ()
 {
-    message (cli::symbol$pointer, " Downloading station location data",
-             appendLF = FALSE)
-    # https://data.cityofnewyork.us/Transportation/Subway-Stations/arq3-7z49
-    u <- "https://data.cityofnewyork.us/api/views/kk4q-3rt2/rows.csv?accessType=DOWNLOAD"
-    check <- utils::download.file (url = u, quiet = TRUE,
-                                   destfile = file.path (tempdir (),
-                                                         "nystations.csv"))
-    if (check != 0)
-        stop ("Failed to download station location data") # nocov
-    message ("\r", cli::symbol$tick, " Downloaded station location data")
+    f <- file.path (tempdir (), "nystations.csv")
+    if (!file.exists (f))
+    {
+        message (cli::symbol$pointer, " Downloading station location data",
+                 appendLF = FALSE)
+        # https://data.cityofnewyork.us/Transportation/Subway-Stations/arq3-7z49
+        u <- paste0 ("https://data.cityofnewyork.us/api/",
+                     "views/kk4q-3rt2/rows.csv?accessType=DOWNLOAD")
+        check <- utils::download.file (url = u, destfile = f, quiet = TRUE)
+        if (check != 0)
+            stop ("Failed to download station location data") # nocov
+        message ("\r", cli::symbol$tick, " Downloaded station location data")
+    } else
+    {
+        message (cli::symbol$tick, " Station location data already downloaded")
+    }
 
-    utils::read.csv (file.path (tempdir (), "nystations.csv"),
-                     stringsAsFactors = FALSE)
+    utils::read.csv (f, stringsAsFactors = FALSE)
 }
 
 match_counts_to_stns <- function (counts, xy)
