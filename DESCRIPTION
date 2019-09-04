@@ -16,6 +16,7 @@ Imports:
     dodgr,
     dplyr,
     magrittr,
+    moveability,
     osmdata,
     raster,
     rvest,

@@ -10,13 +10,15 @@ nypopdens <- function (data_dir = tempdir ())
 {
     check_uspop_file (data_dir)
     cut_pop_raster (data_dir)
+    nyosm_data (data_dir) # check that all OSM data have been downloaded
+    popdens_to_points (data_dir)
 }
 
 pop_file_name <- function (data_dir, type = "usa")
 {
     if (!type == "usa")
         type <- "ny"
-    file.path (data_dir, paste0 (type, "_ppp_2019.tif"))
+    file.path (data_dir, "worldpop", paste0 (type, "_ppp_2019.tif"))
 }
 
 check_uspop_file <- function (data_dir = tempdir ())
@@ -66,12 +68,27 @@ cut_pop_raster <- function (data_dir)
 
 popdens_to_points <- function (data_dir)
 {
+    f <- file.path (data_dir, "worldpop", "pop-points-all.Rds")
+    if (!file.exists (f))
+    {
+        do_popdens_to_points (data_dir)
+    } else
+    {
+    message (cli::symbol$tick,
+             " Population density has already been project onto OSM data")
+    }
+}
+
+do_popdens_to_points <- function (data_dir)
+{
+    message (cli::symbol$pointer, " Projecting population density onto OSM data",
+             appendLF = FALSE)
     fny <- pop_file_name (data_dir, type = "ny")
     if (!file.exists (fny))
         stop ("New York population density file not found") # nocov
 
-    ras <- raster::raster(fny)
-    hw <- readRDS (file.path (data_dir, "ny-hw.Rds"))
+    ras <- raster::raster (fny)
+    hw <- readRDS (file.path (data_dir, "osm", "ny-hw.Rds"))
     hw <- dodgr::weight_streetnet (hw, wt_profile = "foot")
     hw_c <- dodgr::dodgr_contract_graph (hw)
     nodes <- dodgr::dodgr_vertices (hw_c)
@@ -93,5 +110,8 @@ popdens_to_points <- function (data_dir)
     nodes_new <- nodes_joined
     nodes_new$pop <- nodes_new [[layer_name]] /
         sum (nodes_new [[layer_name]], na.rm = TRUE)
-    saveRDS (nodes_new, file = "/data/data/moveability/nyc/worldpop/pop-points-all.Rds")
+    saveRDS (nodes_new,
+             file = file.path (data_dir, "worldpop", "pop-points-all.Rds"))
+    message ("\r", cli::symbol$tick,
+             " Projected population density onto OSM data ")
 }
