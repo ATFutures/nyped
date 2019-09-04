@@ -42,10 +42,15 @@ nyped_data <- function (data_dir = tempdir ())
 
     message ("\r", cli::symbol$tick, " Loaded pedestrian data  ")
 
-    sf::st_sf (weekday = weekday,
+    sf::st_sf (borough = xdat$Borough,
+               street = xdat$Street_Nam,
+               from = xdat$From_Stree,
+               to = xdat$To_Street,
+               weekday = weekday,
                weekend = weekend,
                week = round ((5 * weekday + 2 * weekend) / 7),
-               geometry = x$geometry)
+               geometry = x$geometry,
+               stringsAsFactors = FALSE)
 }
 
 ped_file_name <- function ()

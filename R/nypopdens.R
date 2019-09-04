@@ -11,7 +11,8 @@ nypopdens <- function (data_dir = tempdir ())
     check_uspop_file (data_dir)
     cut_pop_raster (data_dir)
     nyosm_data (data_dir) # check that all OSM data have been downloaded
-    popdens_to_points (data_dir)
+    x <- popdens_to_points (data_dir)
+    x [which (!is.na (x$pop)), ]
 }
 
 pop_file_name <- function (data_dir, type = "usa")
@@ -74,9 +75,10 @@ popdens_to_points <- function (data_dir)
         do_popdens_to_points (data_dir)
     } else
     {
-    message (cli::symbol$tick,
-             " Population density has already been project onto OSM data")
+        message (cli::symbol$tick,
+                 " Population density has already been project onto OSM data")
     }
+    readRDS (f)
 }
 
 do_popdens_to_points <- function (data_dir)

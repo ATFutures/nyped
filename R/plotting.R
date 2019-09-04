@@ -8,11 +8,7 @@
 #' @export
 plot_ny_popdens <- function (data_dir)
 {
-    f <- file.path (data_dir, "worldpop", "pop-points-all.Rds")
-    if (!file.exists (f))
-        stop ("Population density data not found, ",    # nocov
-              "or have not been processed.")            # nocov
-    x <- readRDS (f)
+    x <- nypopdens (data_dir)
 
     requireNamespace ("mapdeck")
     mapdeck::set_token (get_mapbox_token ())
