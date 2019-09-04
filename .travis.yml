@@ -10,3 +10,7 @@ addons:
             - libproj-dev
             - libgeos-dev
             - libgdal-dev
+
+before_install:
+    - Rscript -e 'install.packages("remotes", repos="https://cran.rstudio.com")'
+    - Rscript -e 'remotes::install_github("moveability/moveability")'
