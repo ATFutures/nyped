@@ -1,9 +1,15 @@
-#' nysubway
+#' nysubway_data
 #'
-#' Get New York City subway station counts and coordinates
-#' @return A `data.frame` of subway naes, counts, and geographical coordinates
+#' Download, clean, and join New York City subway station counts and coordinates
+#' @return A `data.frame` of subway names, annual counts, and geographical
+#' coordinates.
+#'
+#' @example
+#' dat <- nysubway_data ()
+#' # library (mapview)
+#' # mapview (x, cex = "count2018", zcol = "count2018")
 #' @export
-nysubway <- function ()
+nysubway_data <- function ()
 {
     dl_ridership ()
     strip_to_table ()
@@ -16,6 +22,11 @@ nysubway <- function ()
 
 dl_ridership <- function ()
 {
+    message (cli::rule (left = "calibration", line = 2, col = "green"))
+    message (cli::symbol$pointer, " Downloading ridership data",
+             appendLF = FALSE)
+    message ("\r", cli::symbol$tick, " Downloaded ridership data  ")
+
     u <- "http://web.mta.info/nyct/facts/ridership/ridership_sub_annual.htm"
     x <- xml2::read_html (u)
     xml2::write_xml (x, file.path (tempdir (), "junk.html"))
@@ -42,8 +53,11 @@ clean_ridership <- function ()
 {
     x <- readLines (file.path (tempdir (), "junk.html"))
     p <- '<img src="../../service/images/'
-    x <- gsub (paste0 (p, '1_16.gif" alt="1 subway" align="texttop">'), "(1)", x)
-    x <- gsub (paste0 (p, '1_16.gif" alt="1 subway" border="0" align="texttop">'), "(1)", x)
+    x <- gsub (paste0 (p, '1_16.gif" alt="1 subway" align="texttop">'),
+               "(1)", x)
+    x <- gsub (paste0 (p, '1_16.gif" alt="1 subway" ',
+                       'border="0" align="texttop">'), "(1)", x)
+
     for (i in 2:7)
         x <- gsub (paste0 (p, i, '.png" alt="', i, ' subway" align="texttop">'), 
                    paste0 ("(", i, ")"), x)
@@ -63,7 +77,7 @@ read_ridership <- function ()
     x <- x [[1]]
     nms <- as.character (2013:2018)
     for (n in nms)
-        x [[n]] <- as.integer (gsub (",", "", x [[n]]))
+        x [[n]] <- suppressWarnings (as.integer (gsub (",", "", x [[n]])))
     x <- x [, 1:which (names (x) == nms [length (nms)])]
     index <- apply (x, 1, function (i) length (which (is.na (i))))
     x <- x [which (index < 6), ]
@@ -96,10 +110,16 @@ read_ridership <- function ()
 
 dl_locations <- function ()
 {
-    message ("Downloading station location data")
+    message (cli::symbol$pointer, " Downloading station location data",
+             appendLF = FALSE)
     u <- "https://data.cityofnewyork.us/api/views/kk4q-3rt2/rows.csv?accessType=DOWNLOAD"
-    utils::download.file (url = u,
-                          destfile = file.path (tempdir (), "nystations.csv"))
+    check <- utils::download.file (url = u, quiet = TRUE,
+                                   destfile = file.path (tempdir (),
+                                                         "nystations.csv"))
+    if (check != 0)
+        stop ("Failed to download station location data") # nocov
+    message ("\r", cli::symbol$tick, " Downloaded station location data")
+
     utils::read.csv (file.path (tempdir (), "nystations.csv"),
                      stringsAsFactors = FALSE)
 }
