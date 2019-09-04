@@ -4,10 +4,10 @@
 #' @return A `data.frame` of subway names, annual counts, and geographical
 #' coordinates.
 #'
-#' @example
+#' @examples
 #' dat <- nysubway_data ()
 #' # library (mapview)
-#' # mapview (x, cex = "count2018", zcol = "count2018")
+#' # mapview (dat, cex = "count2018", zcol = "count2018")
 #' @export
 nysubway_data <- function ()
 {
@@ -17,7 +17,8 @@ nysubway_data <- function ()
     counts <- read_ridership ()
 
     xy <- dl_locations ()
-    match_counts_to_stns (counts, xy)
+    x <- match_counts_to_stns (counts, xy)
+    sf::st_as_sf (x, wkt = "geom", crs = 4326)
 }
 
 dl_ridership <- function ()

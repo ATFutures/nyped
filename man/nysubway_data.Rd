@@ -13,3 +13,8 @@ coordinates.
 \description{
 Download, clean, and join New York City subway station counts and coordinates
 }
+\examples{
+dat <- nysubway_data ()
+# library (mapview)
+# mapview (dat, cex = "count2018", zcol = "count2018")
+}
