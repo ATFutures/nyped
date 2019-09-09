@@ -18,6 +18,7 @@ Imports:
     magrittr,
     moveability,
     osmdata,
+    parallel,
     raster,
     rvest,
     sf,

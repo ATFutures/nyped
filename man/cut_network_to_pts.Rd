@@ -4,14 +4,17 @@
 \alias{cut_network_to_pts}
 \title{cut_network_to_pts}
 \usage{
-cut_network_to_pts(data_dir, k = 700)
+cut_network_to_pts(k = 700, p = NULL, data_dir)
 }
 \arguments{
-\item{data_dir}{The directory in which data are to be, or have previously
-been, downloaded.}
-
 \item{k}{Exponential decay parameter to be used in spatial interaction
 models. This deterines the radius at which to cut the network.}
+
+\item{p}{Pedestrian counts including OSM IDs of nearest points, as returned
+from \link{ped_osm_id}.}
+
+\item{data_dir}{The directory in which data are to be, or have previously
+been, downloaded - only needed if `p` is not provided.}
 }
 \description{
 Cut the New York City street network into portions surrounding each
