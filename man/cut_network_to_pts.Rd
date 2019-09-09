@@ -4,9 +4,11 @@
 \alias{cut_network_to_pts}
 \title{cut_network_to_pts}
 \usage{
-cut_network_to_pts(k = 700, p = NULL, data_dir)
+cut_network_to_pts(net, k = 700, p = NULL, data_dir)
 }
 \arguments{
+\item{net}{Uncontracted street network of New York City}
+
 \item{k}{Exponential decay parameter to be used in spatial interaction
 models. This deterines the radius at which to cut the network.}
 

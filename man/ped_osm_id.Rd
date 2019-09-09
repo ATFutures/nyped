@@ -4,11 +4,13 @@
 \alias{ped_osm_id}
 \title{ped_osm_id}
 \usage{
-ped_osm_id(data_dir)
+ped_osm_id(data_dir, net = NULL)
 }
 \arguments{
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
+
+\item{net}{Weighted street network; loaded from `data_dir` if not provided}
 }
 \value{
 A `data.frame` of pedestrian counts, associated spatial coordinates,
