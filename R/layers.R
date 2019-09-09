@@ -29,7 +29,7 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity", data_dir)
     message (cli::symbol$pointer, " Contracting street network",
              appendLF = FALSE)
     net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
-    message ("\r", cli::symbol$tick, " Contracted street network")
+    message ("\r", cli::symbol$tick, " Contracted street network ")
 
     layer_subway_attr (net, data_dir, p, s, k = 700)
 }
@@ -73,6 +73,8 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700)
 
     message (cli::symbol$pointer, " Aligning flows to pedestrian count points")
     flows <- rep (NA, nrow (p))
+    # dlim <- 12 * k # limit of exp (-d / k) = 1e-12
+    # This is only used in the commented-out lines below for cutting the graph
     st0 <- Sys.time ()
     pb <- utils::txtProgressBar (style = 3)
     for (i in seq (nrow (p)))
@@ -88,6 +90,12 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700)
         # flows
         di <- dodgr::dodgr_dists (net, from = p$id [i]) [1, ]
         di <- di [order (di)]
+        # --> code to first cut graph down via dodgr_isoverts. This takes 2-3
+        # times longer
+        #iv <- dodgr::dodgr_isoverts (net, from = p$id [i], dlim = dlim)
+        #et_i <- net [which (net$.vx0 %in% iv$id | net$.vx1 %in% iv$id), ]
+        #i <- dodgr::dodgr_dists (net, from = p$id [i]) [1, ]
+        #i <- di [order (di)]
 
         f_ord <- net_f$flow [match (net_f$.vx0, names (di))]
         flow0 <- f_ord [which (f_ord > 0)] [1]
@@ -100,6 +108,8 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700)
     close (pb)
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
+    message (cli::symbol$tick, " Aligned flows to pedestrian count points in ",
+             st, "s")
     message (cli::rule (left = "Finished", line = 2, col = "green"))
 
     p$flows <- flows
