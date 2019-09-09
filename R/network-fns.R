@@ -21,14 +21,13 @@ cut_network_to_pts <- function (data_dir, k = 700)
              appendLF = FALSE)
     net <- dodgr::weight_streetnet (hw, wt_profile = "foot")
     v <- dodgr::dodgr_vertices (net)
-    ids <- v$id [dodgr::match_points_to_graph (v, xy)]
     xy$id <- v$id [dodgr::match_points_to_graph (v, xy)]
     message ("\r", cli::symbol$tick, " Weighted street network ")
 
     message (cli::symbol$pointer, " Cutting into ", nrow (p), " components")
     dlim <- k * 12 # equivalent to point at which exp(-d/k) <= 1e-12
     pb <- utils::txtProgressBar (style = 3)
-    for (i in nrow (xy))
+    for (i in seq (nrow (xy)))
     {
         id <- xy$id [i]
         res <- dodgr::dodgr_isoverts (net, from = id, dlim = dlim)
