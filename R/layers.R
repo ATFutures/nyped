@@ -44,6 +44,7 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700)
     # a has OSM id's, but these need to be re-matched to values in the actual
     # street network
     a$id <- v$id [dodgr::match_points_to_graph (v, a [, c ("x", "y")])]
+    a <- a [a$category != "transportation", ]
     id <- NULL # no visible binding note
     a <- dplyr::select (a, c ("id", "x", "y")) %>%
         dplyr::group_by (id) %>%
@@ -53,14 +54,18 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700)
     a$x <- v$x [index]
     a$y <- v$y [index]
 
-    # calculate spatial interaction model between subway and attraction centres
+    # calculate spatial interaction model between subway and attraction centres,
+    # where the latter are weighted by number of centres allocated to each
+    # contracted vertex
     smat <- matrix (s$count2018, nrow = nrow (s), ncol = nrow (a))
     amat <- t (matrix (as.double (a$n), nrow = nrow (a), ncol = nrow (s)))
     dmat <- dodgr::dodgr_dists (net, from = s$id, to = a$id)
+    dmat [is.na (dmat)] <- max (dmat, na.rm = TRUE)
 
     # constrain interaction matrix to unit sum over all possible destinations s->a
-    cmat <- t (matrix (colSums (amat), nrow = nrow (a), ncol = nrow (s)))
-    fmat <- smat * amat * exp (-dmat / k) / cmat
+    fmat <- amat * exp (-dmat / k)
+    cmat <- t (matrix (colSums (fmat), nrow = nrow (a), ncol = nrow (s)))
+    fmat <- smat * fmat / cmat
 
     message ("\r", cli::symbol$tick, " Prepared spatial interaction matrices  ")
     message (cli::symbol$pointer, " Aggregating flows ", appendLF = FALSE)
