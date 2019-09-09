@@ -2,6 +2,7 @@
 
 export("%>%")
 export(clb_osm_data)
+export(cut_network_to_pts)
 export(get_attractors)
 export(get_green_space)
 export(nyosm_data)
