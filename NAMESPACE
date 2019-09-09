@@ -2,7 +2,6 @@
 
 export("%>%")
 export(clb_osm_data)
-export(cut_network_to_pts)
 export(get_attractors)
 export(get_green_space)
 export(ny_layer)
@@ -14,4 +13,5 @@ export(ped_osm_id)
 export(plot_ny_popdens)
 export(plot_ped_counts)
 export(plot_subway_counts)
+export(subway_osm_id)
 importFrom(magrittr,"%>%")

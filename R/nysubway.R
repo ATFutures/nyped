@@ -26,7 +26,7 @@ dl_ridership <- function ()
     f <- file.path (tempdir (), "ridership.html")
     if (!file.exists (f))
     {
-        message (cli::rule (left = "calibration", line = 2, col = "green"))
+        #message (cli::rule (left = "calibration", line = 2, col = "green"))
         message (cli::symbol$pointer, " Downloading ridership data",
                  appendLF = FALSE)
 
