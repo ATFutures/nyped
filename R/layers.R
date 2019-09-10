@@ -12,6 +12,7 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity", data_dir)
 {
     message (cli::rule (left = "New York pedestrian calibration",
                         line = 2, col = "green"))
+    st0 <- Sys.time ()
     if (is.null (net))
     {
         f <- file.path (data_dir, "osm", "ny-hw.Rds")
@@ -31,7 +32,11 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity", data_dir)
     net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
     message ("\r", cli::symbol$tick, " Contracted street network ")
 
-    layer_subway_attr (net, data_dir, p, s, k = 700)
+    res <- layer_subway_attr (net, data_dir, p, s, k = 700)
+    st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
+                   format = "f", digits = 1)
+    message (cli::rule (left = paste0 ("Finished in ", st, "s"),
+                        line = 2, col = "green"))
 }
 
 layer_subway_attr <- function (net, data_dir, p, s, k = 700)
@@ -62,10 +67,16 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700)
     dmat <- dodgr::dodgr_dists (net, from = s$id, to = a$id)
     dmat [is.na (dmat)] <- max (dmat, na.rm = TRUE)
 
-    # constrain interaction matrix to unit sum over all possible destinations s->a
+    # Double-constrain interaction matrix to unit sum over all possible
+    # origins and destinations s->a. For each origin (row), the sum over all
+    # destinations (columns) has to equal one:
     fmat <- amat * exp (-dmat / k)
     cmat <- t (matrix (colSums (fmat), nrow = nrow (a), ncol = nrow (s)))
-    fmat <- smat * fmat / cmat
+    fmat <- fmat / cmat
+    # Each origin (row) should then only allocate the total amount to all
+    # destinations (columns), so fmat is multiplied by smat divided by
+    # ncol(smat) == nrow (a)
+    fmat <- smat * fmat / nrow (a)
 
     message ("\r", cli::symbol$tick, " Prepared spatial interaction matrices  ")
     message (cli::symbol$pointer, " Aggregating flows ", appendLF = FALSE)
@@ -80,42 +91,31 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700)
     flows <- rep (NA, nrow (p))
     # dlim <- 12 * k # limit of exp (-d / k) = 1e-12
     # This is only used in the commented-out lines below for cutting the graph
-    st0 <- Sys.time ()
-    pb <- utils::txtProgressBar (style = 3)
+
+    # Calculate dmat from all pedestrian count points
+    dp <- dodgr::dodgr_dists (net, from = p$id)
+
     for (i in seq (nrow (p)))
     {
         # find edges that flow in and out of that point - these commonly return
         # only NA values, so second approach is implemented
-        #i1 <- which (net_f$.vx0 == p$id [i])
-        #i2 <- which (net_f$.vx1 == p$id [i])
-        #flows [i] <- sum (net_i$flow [i1], na.rm = TRUE) +
-        #    sum (net_i$flow [i2], na.rm = TRUE)
+        i1 <- which (net_f$.vx0 == p$id [i])
+        i2 <- which (net_f$.vx1 == p$id [i])
+        flows [i] <- sum (net_f$flow [i1], na.rm = TRUE) +
+            sum (net_f$flow [i2], na.rm = TRUE)
 
-        # choose first edges near that observation vertex that have non-zero
+        # OR: choose first edges near that observation vertex that have non-zero
         # flows
-        di <- dodgr::dodgr_dists (net, from = p$id [i]) [1, ]
-        di <- di [order (di)]
-        # --> code to first cut graph down via dodgr_isoverts. This takes 2-3
-        # times longer
-        #iv <- dodgr::dodgr_isoverts (net, from = p$id [i], dlim = dlim)
-        #et_i <- net [which (net$.vx0 %in% iv$id | net$.vx1 %in% iv$id), ]
-        #i <- dodgr::dodgr_dists (net, from = p$id [i]) [1, ]
-        #i <- di [order (di)]
-
-        f_ord <- net_f$flow [match (net_f$.vx0, names (di))]
-        flow0 <- f_ord [which (f_ord > 0)] [1]
-        f_ord <- net_f$flow [match (net_f$.vx1, names (di))]
-        flow1 <- f_ord [which (f_ord > 0)] [1]
-        flows [i] <- flow0 + flow1
-        utils::setTxtProgressBar (pb, i / nrow (p))
+        #di <- dp [i, ] [order (dp [i, ])]
+        #f_ord <- net_f$flow [match (net_f$.vx0, names (di))]
+        #flow0 <- f_ord [which (f_ord > 0)] [1]
+        #f_ord <- net_f$flow [match (net_f$.vx1, names (di))]
+        #flow1 <- f_ord [which (f_ord > 0)] [1]
+        #flows [i] <- flow0 + flow1
     }
 
-    close (pb)
-    st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
-                   format = "f", digits = 1)
-    message (cli::symbol$tick, " Aligned flows to pedestrian count points in ",
-             st, "s")
-    message (cli::rule (left = "Finished", line = 2, col = "green"))
+    message ("\r", cli::symbol$tick,
+             " Aligned flows to pedestrian count points ")
 
     p$flows <- flows
     return (p)
