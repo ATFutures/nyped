@@ -13,8 +13,15 @@
 ny_layer <- function (net = NULL, from = "subway", to = "activity",
                       k = 700, data_dir)
 {
-    message (cli::rule (center = "New York pedestrian calibration",
-                        line = 2, col = "green"))
+    txt <- "New York pedestrian calibration:"
+    if (to == "activity")
+        txt <- paste (txt, "subway to activity centres")
+    else if (to == "parking")
+        txt <- paste (txt, "subway to parking")
+    else
+        txt <- paste (txt, "dispersal from subway")
+    message (cli::rule (center = txt, line = 2, col = "green"))
+
     st0 <- Sys.time ()
     if (is.null (net))
     {
@@ -108,7 +115,8 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700,
                    format = "f", digits = 1)
     message ("\r", cli::symbol$tick, " Aggregated flows in ", st, "s")
 
-    message (cli::symbol$pointer, " Aligning flows to pedestrian count points")
+    message (cli::symbol$pointer, " Aligning flows to pedestrian count points",
+             appendLF = FALSE)
     flows <- rep (NA, nrow (p))
     # dlim <- 12 * k # limit of exp (-d / k) = 1e-12
     # This is only used in the commented-out lines below for cutting the graph
@@ -149,7 +157,7 @@ layer_subway_disperse <- function (net, data_dir, p, s, k = 700)
 
     st0 <- Sys.time ()
     net_f <- dodgr::dodgr_flows_disperse (net, from = s$id,
-                                          dens = s$count2018, k = 700)
+                                          dens = s$count2018, k = k)
 
 
 
