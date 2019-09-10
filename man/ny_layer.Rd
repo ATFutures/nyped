@@ -12,7 +12,8 @@ ny_layer(net = NULL, from = "subway", to = "activity", k = 700,
 
 \item{from}{Category of origins for pedestrian flows}
 
-\item{to}{Category of destinations for pedestrian flows}
+\item{to}{Category of destinations for pedestrian flows; one of "activity",
+"parking", or anything else to estimate dispersal.}
 
 \item{k}{Width of exponential decay (in m) for spatial interaction models}
 

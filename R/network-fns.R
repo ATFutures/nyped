@@ -21,6 +21,16 @@ ped_osm_id <- function (data_dir, net = NULL)
     xy$weekend <- p$weekend
     xy$week <- p$week
 
+    # There are 2 counters which map on to the same OSM ID, so:
+    id <- names (table (xy$id) [which (table (xy$id) == 2)])
+    index <- which (xy$id == id)
+    i <- which.max (xy$week [index])
+    xy$weekday [index [i]] <- sum (xy$weekday [index])
+    xy$weekend [index [i]] <- sum (xy$weekend [index])
+    xy$week [index [i]] <- sum (xy$week [index])
+    index <- seq (nrow (xy)) [!seq (nrow (xy)) %in% index [-i]]
+    xy <- xy [index, ]
+
     return (xy)
 }
 

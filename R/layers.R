@@ -4,7 +4,8 @@
 #'
 #' @param net Weighted street network; loaded from `data_dir` if not provided
 #' @param from Category of origins for pedestrian flows
-#' @param to Category of destinations for pedestrian flows
+#' @param to Category of destinations for pedestrian flows; one of "activity",
+#' "parking", or anything else to estimate dispersal.
 #' @param k Width of exponential decay (in m) for spatial interaction models
 #' @param data_dir The directory in which data are to be, or have previously
 #' been, downloaded.
@@ -25,7 +26,6 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
         net <- dodgr::weight_streetnet (hw, wt_profile = "foot")
         message ("\r", cli::symbol$tick, " Weighted street network ")
     }
-    v <- dodgr::dodgr_vertices (net)
 
     p <- ped_osm_id (net = net)
     s <- subway_osm_id (net = net)
@@ -36,6 +36,8 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
 
     if (to == "activity")
         res <- layer_subway_attr (net, data_dir, p, s, k = k)
+    else if (to == "parking")
+        res <- layer_subway_attr (net, data_dir, p, s, k = k, parking = TRUE)
     else
         res <- layer_subway_disperse (net, data_dir, p, s, k = k)
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
@@ -46,7 +48,8 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
     return (res)
 }
 
-layer_subway_attr <- function (net, data_dir, p, s, k = 700)
+layer_subway_attr <- function (net, data_dir, p, s, k = 700,
+                               parking = FALSE)
 {
     message (cli::symbol$pointer, " Preparing spatial interaction matrices",
              appendLF = FALSE)
@@ -56,11 +59,22 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700)
     # a has OSM id's, but these need to be re-matched to values in the actual
     # street network
     a$id <- v$id [dodgr::match_points_to_graph (v, a [, c ("x", "y")])]
-    a <- a [a$category != "transportation", ]
-    id <- NULL # no visible binding note
-    a <- dplyr::select (a, c ("id", "x", "y")) %>%
-        dplyr::group_by (id) %>%
-        dplyr::summarise (n = length (id))
+    id <- capacity <- NULL # no visible binding note
+    if (!parking)
+    {
+        a <- a [a$category != "transportation", ]
+        a <- dplyr::select (a, c ("id", "x", "y")) %>%
+            dplyr::group_by (id) %>%
+            dplyr::summarise (n = length (id))
+    } else
+    {
+        a <- a [a$category == "transportation", ]
+        suppressWarnings (a$capacity <- as.integer (a$capacity))
+        a$capacity [is.na (a$capacity)] <- stats::median (a$capacity, na.rm = TRUE)
+        a <- dplyr::select (a, c ("id", "capacity")) %>%
+            dplyr::group_by (id) %>%
+            dplyr::summarise (n = sum (capacity))
+    }
     # then put the coordinates back from the graph vertices
     index <- match (a$id, v$id)
     a$x <- v$x [index]
