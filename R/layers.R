@@ -10,7 +10,7 @@
 #' @export
 ny_layer <- function (net = NULL, from = "subway", to = "activity", data_dir)
 {
-    message (cli::rule (left = "New York pedestrian calibration",
+    message (cli::rule (center = "New York pedestrian calibration",
                         line = 2, col = "green"))
     st0 <- Sys.time ()
     if (is.null (net))
@@ -35,8 +35,10 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity", data_dir)
     res <- layer_subway_attr (net, data_dir, p, s, k = 700)
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
-    message (cli::rule (left = paste0 ("Finished in ", st, "s"),
+    message (cli::rule (center = paste0 ("Finished in ", st, "s"),
                         line = 2, col = "green"))
+
+    return (res)
 }
 
 layer_subway_attr <- function (net, data_dir, p, s, k = 700)
