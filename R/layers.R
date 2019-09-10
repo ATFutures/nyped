@@ -3,12 +3,14 @@
 #' Calculate one flow layer of pedestrian densities for New York City
 #'
 #' @param net Weighted street network; loaded from `data_dir` if not provided
-#' @param data_dir The directory in which data are to be, or have previously
-#' been, downloaded.
 #' @param from Category of origins for pedestrian flows
 #' @param to Category of destinations for pedestrian flows
+#' @param k Width of exponential decay (in m) for spatial interaction models
+#' @param data_dir The directory in which data are to be, or have previously
+#' been, downloaded.
 #' @export
-ny_layer <- function (net = NULL, from = "subway", to = "activity", data_dir)
+ny_layer <- function (net = NULL, from = "subway", to = "activity",
+                      k = 700, data_dir)
 {
     message (cli::rule (center = "New York pedestrian calibration",
                         line = 2, col = "green"))
@@ -32,7 +34,10 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity", data_dir)
     net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
     message ("\r", cli::symbol$tick, " Contracted street network ")
 
-    res <- layer_subway_attr (net, data_dir, p, s, k = 700)
+    if (to == "activity")
+        res <- layer_subway_attr (net, data_dir, p, s, k = k)
+    else
+        res <- layer_subway_disperse (net, data_dir, p, s, k = k)
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
     message (cli::rule (center = paste0 ("Finished in ", st, "s"),
@@ -114,6 +119,44 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700)
         #f_ord <- net_f$flow [match (net_f$.vx1, names (di))]
         #flow1 <- f_ord [which (f_ord > 0)] [1]
         #flows [i] <- flow0 + flow1
+    }
+
+    message ("\r", cli::symbol$tick,
+             " Aligned flows to pedestrian count points ")
+
+    p$flows <- flows
+    return (p)
+}
+
+layer_subway_disperse <- function (net, data_dir, p, s, k = 700)
+{
+    message (cli::symbol$pointer, " Dispersing flows ", appendLF = FALSE)
+    v <- dodgr::dodgr_vertices (net)
+
+    st0 <- Sys.time ()
+    net_f <- dodgr::dodgr_flows_disperse (net, from = s$id,
+                                          dens = s$count2018, k = 700)
+
+
+
+    st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
+                   format = "f", digits = 1)
+    message ("\r", cli::symbol$tick, " Dispersed flows in ", st, "s")
+
+    message (cli::symbol$pointer, " Aligning flows to pedestrian count points")
+    flows <- rep (NA, nrow (p))
+
+    # Calculate dmat from all pedestrian count points
+    dp <- dodgr::dodgr_dists (net, from = p$id)
+
+    for (i in seq (nrow (p)))
+    {
+        # find edges that flow in and out of that point - these commonly return
+        # only NA values, so second approach is implemented
+        i1 <- which (net_f$.vx0 == p$id [i])
+        i2 <- which (net_f$.vx1 == p$id [i])
+        flows [i] <- sum (net_f$flow [i1], na.rm = TRUE) +
+            sum (net_f$flow [i2], na.rm = TRUE)
     }
 
     message ("\r", cli::symbol$tick,

@@ -4,7 +4,8 @@
 \alias{ny_layer}
 \title{ny_layer}
 \usage{
-ny_layer(net = NULL, from = "subway", to = "activity", data_dir)
+ny_layer(net = NULL, from = "subway", to = "activity", k = 700,
+  data_dir)
 }
 \arguments{
 \item{net}{Weighted street network; loaded from `data_dir` if not provided}
@@ -12,6 +13,8 @@ ny_layer(net = NULL, from = "subway", to = "activity", data_dir)
 \item{from}{Category of origins for pedestrian flows}
 
 \item{to}{Category of destinations for pedestrian flows}
+
+\item{k}{Width of exponential decay (in m) for spatial interaction models}
 
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
