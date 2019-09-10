@@ -53,3 +53,51 @@ subway_osm_id <- function (data_dir, net = NULL)
     s$id <- v$id [dodgr::match_points_to_graph (v, sxy)]
     s [which (s$id %in% v$id), ]
 }
+
+#' cut_network_to_pts
+#'
+#' Cut the New York City street network into portions surrounding each
+#' pedestrian counting point.
+#'
+#' @param net Weighted street network; loaded from `data_dir` if not provided
+#' @param k Exponential decay parameter to be used in spatial interaction
+#' models. This deterines the radius at which to cut the network.
+#' @param p Pedestrian counts including OSM IDs of nearest points, as returned
+#' from \link{ped_osm_id}.
+#' @param data_dir The directory in which data are to be, or have previously
+#' been, downloaded - only needed if `p` is not provided.
+#' @export
+cut_network_to_pts <- function (net, k = 1000, p = NULL, data_dir)
+{
+    if (is.null (p))
+        p <- ped_osm_id (data_dir)
+
+    dlim <- k * 12 # equivalent to point at which exp(-d/k) <= 1e-12
+
+    # set up parallel job over origin points
+    message (cli::symbol$pointer, " Setting up parallel job ", appendLF = FALSE)
+    no_cores <- parallel::detectCores () - 1
+    cl <- parallel::makeCluster (no_cores)
+    parallel::clusterExport (cl, c ("net", "dlim", "data_dir"),
+                             envir = environment ())
+    message ("\r", cli::symbol$tick, " Successfully set up parallel job ")
+
+    message (cli::symbol$pointer, " Cutting into ", nrow (p), " components")
+    st0 <- Sys.time ()
+    chk <- parallel::parLapply (cl, p$id, function (i) {
+        res <- dodgr::dodgr_isoverts (net, from = i, dlim = dlim)
+        index <- which (net$.vx0 %in% res$id | net$.vx1 %in% res$id)
+        net_cut <- net [index, ]
+        attr (net_cut, "k") <- k
+        nm <- file.path (data_dir, "osm", "ny-cut",
+                         paste0 ("ny-hw", i, ".Rds"))
+        saveRDS (net_cut, nm)
+             })
+
+    parallel::stopCluster (cl)
+
+    st <- as.numeric (difftime (Sys.time (), st0, units = "secs"))
+    message ("\r", cli::symbol$tick, " Successfully cut network into ",
+             nrow (p), " components in ",
+             formatC (st, format = "f", digits = 1), "s")
+}
