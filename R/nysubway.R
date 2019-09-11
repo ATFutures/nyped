@@ -1,6 +1,7 @@
 #' nysubway_data
 #'
 #' Download, clean, and join New York City subway station counts and coordinates
+#' @param quiet If `FALSE`, display progress information on screen
 #' @return A `data.frame` of subway names, annual counts, and geographical
 #' coordinates.
 #'
@@ -9,33 +10,34 @@
 #' # library (mapview)
 #' # mapview (dat, cex = "count2018", zcol = "count2018")
 #' @export
-nysubway_data <- function ()
+nysubway_data <- function (quiet = FALSE)
 {
-    dl_ridership ()
+    dl_ridership (quiet = quiet)
     strip_to_table ()
     clean_ridership ()
     counts <- read_ridership ()
 
-    xy <- dl_locations ()
+    xy <- dl_locations (quiet = quiet)
     x <- match_counts_to_stns (counts, xy)
     sf::st_as_sf (x, wkt = "geom", crs = 4326)
 }
 
-dl_ridership <- function ()
+dl_ridership <- function (quiet = FALSE)
 {
     f <- file.path (tempdir (), "ridership.html")
     if (!file.exists (f))
     {
-        #message (cli::rule (left = "calibration", line = 2, col = "green"))
-        message (cli::symbol$pointer, " Downloading ridership data",
-                 appendLF = FALSE)
+        if (!quiet)
+            message (cli::symbol$pointer, " Downloading ridership data",
+                     appendLF = FALSE)
 
         # http://web.mta.info/nyct/facts/ridership/#chart_s
         u <- "http://web.mta.info/nyct/facts/ridership/ridership_sub_annual.htm"
         x <- xml2::read_html (u)
         xml2::write_xml (x, file.path (tempdir (), "ridership.html"))
-        message ("\r", cli::symbol$tick, " Downloaded ridership data  ")
-    } else
+        if (!quiet)
+            message ("\r", cli::symbol$tick, " Downloaded ridership data  ")
+    } else if (!quiet)
     {
         message (cli::symbol$tick, " Ridership data already downloaded ")
     }
@@ -117,21 +119,23 @@ read_ridership <- function ()
     return (x)
 }
 
-dl_locations <- function ()
+dl_locations <- function (quiet = FALSE)
 {
     f <- file.path (tempdir (), "nystations.csv")
     if (!file.exists (f))
     {
-        message (cli::symbol$pointer, " Downloading station location data",
-                 appendLF = FALSE)
+        if (!quiet)
+            message (cli::symbol$pointer, " Downloading station location data",
+                     appendLF = FALSE)
         # https://data.cityofnewyork.us/Transportation/Subway-Stations/arq3-7z49
         u <- paste0 ("https://data.cityofnewyork.us/api/",
                      "views/kk4q-3rt2/rows.csv?accessType=DOWNLOAD")
         check <- utils::download.file (url = u, destfile = f, quiet = TRUE)
         if (check != 0)
             stop ("Failed to download station location data") # nocov
-        message ("\r", cli::symbol$tick, " Downloaded station location data")
-    } else
+        if (!quiet)
+            message ("\r", cli::symbol$tick, " Downloaded station location data")
+    } else if (!quiet)
     {
         message (cli::symbol$tick, " Station location data already downloaded")
     }

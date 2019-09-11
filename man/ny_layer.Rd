@@ -5,7 +5,7 @@
 \title{ny_layer}
 \usage{
 ny_layer(net = NULL, from = "subway", to = "activity", k = 700,
-  data_dir)
+  data_dir, quiet = FALSE)
 }
 \arguments{
 \item{net}{Weighted street network; loaded from `data_dir` if not provided}
@@ -20,6 +20,8 @@ ny_layer(net = NULL, from = "subway", to = "activity", k = 700,
 
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
+
+\item{quiet}{If `FALSE`, display progress information on screen}
 }
 \description{
 Calculate one flow layer of pedestrian densities for New York City

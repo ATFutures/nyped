@@ -4,7 +4,10 @@
 \alias{nysubway_data}
 \title{nysubway_data}
 \usage{
-nysubway_data()
+nysubway_data(quiet = FALSE)
+}
+\arguments{
+\item{quiet}{If `FALSE`, display progress information on screen}
 }
 \value{
 A `data.frame` of subway names, annual counts, and geographical

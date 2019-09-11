@@ -3,6 +3,7 @@
 #' Download, clean, and return New York City pedestrian count data
 #' @param data_dir The directory in which data are to be, or have previously
 #' been, downloaded.
+#' @param quiet If `FALSE`, display progress information on screen
 #' @return A `data.frame` of pedestrian counts, and geographical coordinates,
 #' with counts for weekdays, weekends, and "week" derived as a weighted
 #' combintaion of both.
@@ -12,19 +13,19 @@
 #' # library (mapview)
 #' # mapview (dat, cex = "week", zcol = "week")
 #' @export
-nyped_data <- function (data_dir = tempdir ())
+nyped_data <- function (data_dir = tempdir (), quiet = FALSE)
 {
     # pedestrian count data from
     # https://www1.nyc.gov/html/dot/html/about/datafeeds.shtml#Pedestrians
     # counts are weekdays ("\_D") with "\_AM" and "\_PM" counts, and weekends
     # ("\_D2") with single counts ("\_MD")
-    #message (cli::rule (left = "calibration", line = 2, col = "green"))
-    check_ped_file (data_dir)
+    check_ped_file (data_dir, quiet = quiet)
     files <- load_ped_file (data_dir)
     f <- files [grep ("\\.shp", files)]
 
-    message (cli::symbol$pointer, " Loading pedestrian data",
-             appendLF = FALSE)
+    if (!quiet)
+        message (cli::symbol$pointer, " Loading pedestrian data",
+                 appendLF = FALSE)
     x <- sf::st_read (f, stringsAsFactors = FALSE, quiet = TRUE)
     x <- sf::st_transform (x, 4326)
     xdat <- x
@@ -40,7 +41,8 @@ nyped_data <- function (data_dir = tempdir ())
     index <- grep ("\\_MD", names (xdat))
     weekend <- rowSums (xdat [, index])
 
-    message ("\r", cli::symbol$tick, " Loaded pedestrian data  ")
+    if (!quiet)
+        message ("\r", cli::symbol$tick, " Loaded pedestrian data  ")
 
     sf::st_sf (borough = xdat$Borough,
                street = xdat$Street_Nam,
@@ -58,19 +60,21 @@ ped_file_name <- function ()
     "nycdot-bi-annual-pedestrian-index.zip"
 }
 
-check_ped_file <- function (data_dir = tempdir ())
+check_ped_file <- function (data_dir = tempdir (), quiet = FALSE)
 {
     f <- file.path (data_dir, ped_file_name ())
     if (!file.exists (f))
     {
-        message (cli::symbol$pointer, " Downloading pedestrian data",
-                 appendLF = FALSE)
+        if (!quiet)
+            message (cli::symbol$pointer, " Downloading pedestrian data",
+                     appendLF = FALSE)
         u <- paste0 ("https://www1.nyc.gov/html/dot/downloads/misc/",
                      "nycdot-bi-annual-pedestrian-index.zip")
         check <- utils::download.file (url = u, destfile = f, quiet = TRUE)
         if (check != 0)
             stop ("Failed to download station location data") # nocov
-        message ("\r", cli::symbol$tick, " Downloaded pedestrian data  ")
+        if (!quiet)
+            message ("\r", cli::symbol$tick, " Downloaded pedestrian data  ")
     }
 }
 

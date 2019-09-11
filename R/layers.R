@@ -10,9 +10,10 @@
 #' @param k Width of exponential decay (in m) for spatial interaction models
 #' @param data_dir The directory in which data are to be, or have previously
 #' been, downloaded.
+#' @param quiet If `FALSE`, display progress information on screen
 #' @export
 ny_layer <- function (net = NULL, from = "subway", to = "activity",
-                      k = 700, data_dir)
+                      k = 700, data_dir, quiet = FALSE)
 {
     txt <- "New York pedestrian calibration:"
     if (from == "residential")
@@ -27,7 +28,8 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
         txt <- paste (txt, "subway to residential")
     else
         txt <- paste (txt, "dispersal from subway")
-    message (cli::rule (center = txt, line = 2, col = "green"))
+    if (!quiet)
+        message (cli::rule (center = txt, line = 2, col = "green"))
 
     st0 <- Sys.time ()
     if (is.null (net))
@@ -35,42 +37,67 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
         f <- file.path (data_dir, "osm", "ny-hw.Rds")
         hw <- readRDS (f)
         dodgr::dodgr_cache_off ()
-        message (cli::symbol$pointer, " Weighting street network",
-                 appendLF = FALSE)
+        if (!quiet)
+            message (cli::symbol$pointer, " Weighting street network",
+                     appendLF = FALSE)
         net <- dodgr::weight_streetnet (hw, wt_profile = "foot")
-        message ("\r", cli::symbol$tick, " Weighted street network ")
+        if (!quiet)
+            message ("\r", cli::symbol$tick, " Weighted street network ")
     }
 
-    p <- ped_osm_id (net = net)
-    s <- subway_osm_id (net = net)
-    message (cli::symbol$pointer, " Contracting street network",
-             appendLF = FALSE)
+    p <- ped_osm_id (net = net, quiet = TRUE)
+    s <- subway_osm_id (net = net, quiet = TRUE)
+    if (!quiet)
+        message (cli::symbol$pointer, " Contracting street network",
+                 appendLF = FALSE)
     net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
-    message ("\r", cli::symbol$tick, " Contracted street network ")
+    if (!quiet)
+        message ("\r", cli::symbol$tick, " Contracted street network ")
 
     if (from == "residential")
-        res <- layer_subway_res (net, data_dir, p, s, k = k, reverse = TRUE)
+        res <- layer_subway_res (net, data_dir, p, s, k = k, reverse = TRUE,
+                                 quiet = quiet)
     else if (to == "residential")
-        res <- layer_subway_res (net, data_dir, p, s, k = k, reverse = FALSE)
+        res <- layer_subway_res (net, data_dir, p, s, k = k, reverse = FALSE,
+                                 quiet = quiet)
     else if (to == "activity")
-        res <- layer_subway_attr (net, data_dir, p, s, k = k)
+        res <- layer_subway_attr (net, data_dir, p, s, k = k, quiet = quiet)
     else if (to == "parking")
-        res <- layer_subway_attr (net, data_dir, p, s, k = k, parking = TRUE)
+        res <- layer_subway_attr (net, data_dir, p, s, k = k, parking = TRUE,
+                                  quiet = quiet)
     else
-        res <- layer_subway_disperse (net, data_dir, p, s, k = k)
+        res <- layer_subway_disperse (net, data_dir, p, s, k = k,
+                                      quiet = quiet)
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
-    message (cli::rule (center = paste0 ("Finished in ", st, "s"),
-                        line = 2, col = "green"))
+    if (!quiet)
+        message (cli::rule (center = paste0 ("Finished in ", st, "s"),
+                            line = 2, col = "green"))
 
     return (res)
 }
 
-layer_subway_attr <- function (net, data_dir, p, s, k = 700,
-                               parking = FALSE)
+#' all_ny_layer2
+#'
+#' Calculate all flow layer of pedestrian densities for New York City, for a
+#' range of widths of exponential spatial interaction functions (`k`-values).
+#'
+#' @param net Weighted street network; loaded from `data_dir` if not provided
+#' @param k Vector of widths of exponential decay (in m) for spatial interaction
+#' models
+#' @param data_dir The directory in which data are to be, or have previously
+#' been, downloaded.
+#' @export
+all_ny_layers <- function (net = NULL, k = 700, data_dir)
 {
-    message (cli::symbol$pointer, " Preparing spatial interaction matrices",
-             appendLF = FALSE)
+}
+
+layer_subway_attr <- function (net, data_dir, p, s, k = 700,
+                               parking = FALSE, quiet = FALSE)
+{
+    if (!quiet)
+        message (cli::symbol$pointer, " Preparing spatial interaction matrices",
+                 appendLF = FALSE)
     v <- dodgr::dodgr_vertices (net)
 
     a <- readRDS (file.path (data_dir, "osm", "ny-attractors.Rds"))
@@ -117,17 +144,25 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700,
     # ncol(smat) == nrow (a)
     fmat <- smat * fmat / nrow (a)
 
-    message ("\r", cli::symbol$tick, " Prepared spatial interaction matrices  ")
-    message (cli::symbol$pointer, " Aggregating flows ", appendLF = FALSE)
+    if (!quiet)
+    {
+        message ("\r", cli::symbol$tick,
+                 " Prepared spatial interaction matrices  ")
+        message (cli::symbol$pointer, " Aggregating flows ", appendLF = FALSE)
+    }
     st0 <- Sys.time ()
     net_f <- dodgr::dodgr_flows_aggregate (net, from = s$id, to = a$id,
                                            flows = fmat)
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
-    message ("\r", cli::symbol$tick, " Aggregated flows in ", st, "s")
+    if (!quiet)
+    {
+        message ("\r", cli::symbol$tick, " Aggregated flows in ", st, "s")
 
-    message (cli::symbol$pointer, " Aligning flows to pedestrian count points",
-             appendLF = FALSE)
+        message (cli::symbol$pointer,
+                 " Aligning flows to pedestrian count points",
+                 appendLF = FALSE)
+    }
     flows <- rep (NA, nrow (p))
     # dlim <- 12 * k # limit of exp (-d / k) = 1e-12
     # This is only used in the commented-out lines below for cutting the graph
@@ -157,16 +192,19 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700,
         }
     }
 
-    message ("\r", cli::symbol$tick,
-             " Aligned flows to pedestrian count points ")
+    if (!quiet)
+        message ("\r", cli::symbol$tick,
+                 " Aligned flows to pedestrian count points ")
 
     p$flows <- flows
     return (p)
 }
 
-layer_subway_disperse <- function (net, data_dir, p, s, k = 700)
+layer_subway_disperse <- function (net, data_dir, p, s, k = 700,
+                                   quiet = FALSE)
 {
-    message (cli::symbol$pointer, " Dispersing flows ", appendLF = FALSE)
+    if (!quiet)
+        message (cli::symbol$pointer, " Dispersing flows ", appendLF = FALSE)
     v <- dodgr::dodgr_vertices (net)
 
     st0 <- Sys.time ()
@@ -177,9 +215,13 @@ layer_subway_disperse <- function (net, data_dir, p, s, k = 700)
 
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
-    message ("\r", cli::symbol$tick, " Dispersed flows in ", st, "s")
+    if (!quiet)
+    {
+        message ("\r", cli::symbol$tick, " Dispersed flows in ", st, "s")
 
-    message (cli::symbol$pointer, " Aligning flows to pedestrian count points")
+        message (cli::symbol$pointer,
+                 " Aligning flows to pedestrian count points")
+    }
     flows <- rep (NA, nrow (p))
 
     # Calculate dmat from all pedestrian count points
@@ -195,8 +237,9 @@ layer_subway_disperse <- function (net, data_dir, p, s, k = 700)
             sum (net_f$flow [i2], na.rm = TRUE)
     }
 
-    message ("\r", cli::symbol$tick,
-             " Aligned flows to pedestrian count points ")
+    if (!quiet)
+        message ("\r", cli::symbol$tick,
+                 " Aligned flows to pedestrian count points ")
 
     p$flows <- flows
     return (p)
@@ -206,10 +249,12 @@ layer_subway_disperse <- function (net, data_dir, p, s, k = 700)
 # weighted by subway counts and destinations by population density.
 # reverse calculates flows from residential areas to subways, with destinations
 # (subways) simply weighted equally and *NOT* by subway counts
-layer_subway_res <- function (net, data_dir, p, s, k = 700, reverse = FALSE)
+layer_subway_res <- function (net, data_dir, p, s, k = 700, reverse = FALSE,
+                              quiet = FALSE)
 {
-    message (cli::symbol$pointer, " Preparing residential density data ",
-             appendLF = FALSE)
+    if (!quiet)
+        message (cli::symbol$pointer, " Preparing residential density data ",
+                 appendLF = FALSE)
     st0 <- Sys.time ()
     v <- dodgr::dodgr_vertices (net)
 
@@ -249,11 +294,14 @@ layer_subway_res <- function (net, data_dir, p, s, k = 700, reverse = FALSE)
 
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
-    message ("\r", cli::symbol$tick, " Prepared residential density data in ",
-             st, "s")
+    if (!quiet)
+    {
+        message ("\r", cli::symbol$tick,
+                 " Prepared residential density data in ", st, "s")
 
-    message (cli::symbol$pointer, " Preparing spatial interaction matrices",
-             appendLF = FALSE)
+        message (cli::symbol$pointer,
+                 " Preparing spatial interaction matrices", appendLF = FALSE)
+    }
     fmat <- exp (-dmat / k)
     cmat <- matrix (rowSums (fmat), nrow = nrow (s), ncol = nrow (nodes_new))
     fmat <- fmat / cmat # all rowSums over stations == 1
@@ -273,19 +321,26 @@ layer_subway_res <- function (net, data_dir, p, s, k = 700, reverse = FALSE)
 
     # then the final spatial interaction matrix is simply:
     fmat <- pmat * fmat
-    message ("\r", cli::symbol$tick, " Prepared spatial interaction matrices ")
+    if (!quiet)
+    {
+        message ("\r", cli::symbol$tick,
+                 " Prepared spatial interaction matrices ")
 
-    # this then takes only 2-3 minutes
-    message (cli::symbol$pointer, " Aggregating flows ", appendLF = FALSE)
+        # this then takes only 2-3 minutes
+        message (cli::symbol$pointer, " Aggregating flows ", appendLF = FALSE)
+    }
     st0 <- Sys.time ()
     net_f <- dodgr::dodgr_flows_aggregate (net, from = s$id, to = nodes_new$id,
                                            flows = fmat)
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
-    message ("\r", cli::symbol$tick, " Aggregated flows in ", st, "s")
+    if (!quiet)
+    {
+        message ("\r", cli::symbol$tick, " Aggregated flows in ", st, "s")
 
-    message (cli::symbol$pointer, " Aligning flows to pedestrian count points",
-             appendLF = FALSE)
+        message (cli::symbol$pointer,
+                 " Aligning flows to pedestrian count points", appendLF = FALSE)
+    }
     flows <- rep (NA, nrow (p))
     # dlim <- 12 * k # limit of exp (-d / k) = 1e-12
     # This is only used in the commented-out lines below for cutting the graph
@@ -315,8 +370,9 @@ layer_subway_res <- function (net, data_dir, p, s, k = 700, reverse = FALSE)
         }
     }
 
-    message ("\r", cli::symbol$tick,
-             " Aligned flows to pedestrian count points ")
+    if (!quiet)
+        message ("\r", cli::symbol$tick,
+                 " Aligned flows to pedestrian count points ")
 
     p$flows <- flows
     return (p)

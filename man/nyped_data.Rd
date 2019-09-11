@@ -4,11 +4,13 @@
 \alias{nyped_data}
 \title{nyped_data}
 \usage{
-nyped_data(data_dir = tempdir())
+nyped_data(data_dir = tempdir(), quiet = FALSE)
 }
 \arguments{
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
+
+\item{quiet}{If `FALSE`, display progress information on screen}
 }
 \value{
 A `data.frame` of pedestrian counts, and geographical coordinates,
