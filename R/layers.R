@@ -92,19 +92,19 @@ all_ny_layers <- function (net = NULL, k = 2:9 * 100, data_dir)
 {
     from <- c ("residential", rep ("subway", 4))
     to <- c ("subway", "activity", "parking", "residential", "disperse")
-    my_arrow <- paste0 (c (cli::symbol$em_dash, cli::symbol$arrow_right),
-                        collapse = "")
+    my_arrow <- paste0 (cli::symbol$em_dash, cli::symbol$arrow_right)
     t0 <- Sys.time ()
     for (i in seq (from))
     {
-        txt <- paste0 (from [i], " ", my_arrow, " ", to [i])
+        txt <- paste0 (from [i], " ", my_arrow, " ", to [i], " : ")
         msg <- paste0 (cli::col_green (my_arrow), " ",
-                       cli::col_blue (txt), ": ")
+                       cli::col_blue (txt))
 
         for (j in k)
         {
-            msg <- paste0 (msg, " k = ", j, "m ", collapse = "")
-            message (msg)
+            msg <- paste0 (msg, " k = ", j, "m", collapse = "")
+            message (msg, appendLF = FALSE)
+            cat (stdout ()) # necessary to flush the buffer here - but why?
             st0 <- Sys.time ()
             x <- ny_layer (net, data_dir = data_dir, k = k, quiet = TRUE,
                            from = from [i], to = to [i])
@@ -117,7 +117,7 @@ all_ny_layers <- function (net = NULL, k = 2:9 * 100, data_dir)
                                         substring (to [i], 1, 3), "-k",
                                         k, ".Rds"))
             saveRDS (x, file = fname)
-            message (" done in ", st, "s")
+            message ("\r", msg, "; done in ", st, "s")
         }
     }
     message ("Total elapsed time = ", format_time_int (st0))
