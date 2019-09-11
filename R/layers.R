@@ -88,8 +88,50 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
 #' @param data_dir The directory in which data are to be, or have previously
 #' been, downloaded.
 #' @export
-all_ny_layers <- function (net = NULL, k = 700, data_dir)
+all_ny_layers <- function (net = NULL, k = 2:9 * 100, data_dir)
 {
+    from <- c ("residential", rep ("subway", 4))
+    to <- c ("subway", "activity", "parking", "residential", "disperse")
+    my_arrow <- paste0 (c (cli::symbol$em_dash, cli::symbol$arrow_right),
+                        collapse = "")
+    t0 <- Sys.time ()
+    for (i in seq (from))
+    {
+        txt <- paste0 (from [i], " ", my_arrow, " ", to [i])
+        message (cli::col_green (my_arrow), " ", cli::col_blue (txt), ": ",
+                 appendLF = FALSE)
+
+        for (j in k)
+        {
+            message ("k = ", j, "m ", appendLF = FALSE)
+            st0 <- Sys.time ()
+            x <- ny_layer (net, data_dir = data_dir, k = k, quiet = TRUE,
+                           from = from [i], to = to [i])
+            st <- formatC (as.numeric (difftime (Sys.time (), st0,
+                                                 units = "sec")),
+                           format = "f", digits = 1)
+            fname <- file.path (data_dir, "calibration",
+                                paste0 ("flow-",
+                                        substring (from [i], 1, 3), "-",
+                                        substring (to [i], 1, 3), "-k",
+                                        k, ".Rds"))
+            saveRDS (x, file = fname)
+            message (" done in ", st, "s")
+        }
+    }
+    message ("Total elapsed time = ", format_time_int (st0))
+}
+
+format_time_int <- function (st0)
+{
+    st <- as.integer (difftime (Sys.time (), st0, units = "sec"))
+    hh <- floor (st / 3600)
+    mm <- floor ((st - hh * 3600) / 60)
+    ss <- st - hh * 3600 - mm * 60
+    hh <- sprintf ("%02d", hh)
+    mm <- sprintf ("%02d", mm)
+    ss <- sprintf ("%02d", ss)
+    paste0 (hh, ":", mm, ":", ss)
 }
 
 layer_subway_attr <- function (net, data_dir, p, s, k = 700,
