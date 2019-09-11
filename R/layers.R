@@ -98,12 +98,13 @@ all_ny_layers <- function (net = NULL, k = 2:9 * 100, data_dir)
     for (i in seq (from))
     {
         txt <- paste0 (from [i], " ", my_arrow, " ", to [i])
-        message (cli::col_green (my_arrow), " ", cli::col_blue (txt), ": ",
-                 appendLF = FALSE)
+        msg <- paste0 (cli::col_green (my_arrow), " ",
+                       cli::col_blue (txt), ": ")
 
         for (j in k)
         {
-            message ("k = ", j, "m ", appendLF = FALSE)
+            msg <- paste0 (msg, " k = ", j, "m ", collapse = "")
+            message (msg)
             st0 <- Sys.time ()
             x <- ny_layer (net, data_dir = data_dir, k = k, quiet = TRUE,
                            from = from [i], to = to [i])
