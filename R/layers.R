@@ -120,7 +120,7 @@ all_ny_layers <- function (net = NULL, k = 2:9 * 100, data_dir)
             message ("\r", msg, "; done in ", st, "s")
         }
     }
-    message ("Total elapsed time = ", format_time_int (st0))
+    message ("Total elapsed time = ", format_time_int (t0))
 }
 
 format_time_int <- function (st0)
