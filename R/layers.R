@@ -152,7 +152,7 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700,
                  appendLF = FALSE)
     v <- dodgr::dodgr_vertices (net)
 
-    a <- get_attractors (data_dir, v, type = to)
+    a <- get_attractor_layer (data_dir, v, type = to)
 
     # calculate spatial interaction model between subway and attraction centres,
     # where the latter are weighted by number of centres allocated to each
@@ -229,7 +229,7 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700,
     return (p)
 }
 
-get_attractors <- function (data_dir, v, type = "education")
+get_attractor_layer <- function (data_dir, v, type = "education")
 {
     type <- match.arg (type, c ("residential", "education", "entertainment",
                                 "healthcare", "sustenance", "transportation",

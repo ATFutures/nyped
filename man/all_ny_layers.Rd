@@ -2,7 +2,7 @@
 % Please edit documentation in R/layers.R
 \name{all_ny_layers}
 \alias{all_ny_layers}
-\title{all_ny_layer2}
+\title{all_ny_layers}
 \usage{
 all_ny_layers(net = NULL, k = 2:9 * 100, data_dir)
 }

@@ -4,7 +4,12 @@
 \alias{get_attractors}
 \title{get_attractors}
 \usage{
-get_attractors(data_dir, type = "education")
+get_attractors(bbox, quiet = FALSE)
+}
+\arguments{
+\item{bbox}{Bounding box for which green space polygons are to be extracted.}
+
+\item{quiet}{If `TRUE`, dump progress information to screen.}
 }
 \description{
 Get points of trip attraction
