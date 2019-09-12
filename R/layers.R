@@ -97,16 +97,16 @@ all_ny_layers <- function (net = NULL, k = 2:9 * 100, data_dir)
     for (i in seq (from))
     {
         txt <- paste0 (from [i], " ", my_arrow, " ", to [i], " : ")
-        msg <- paste0 (cli::col_green (my_arrow), " ",
-                       cli::col_blue (txt))
+        msg0 <- paste0 (cli::col_green (my_arrow), " ",
+                        cli::col_blue (txt))
 
         for (j in k)
         {
-            msg <- paste0 (msg, " k = ", j, "m", collapse = "")
+            msg <- paste0 (msg0, " k = ", j, "m", collapse = "")
             message (msg, appendLF = FALSE)
             cat (stdout ()) # necessary to flush the buffer here - but why?
             st0 <- Sys.time ()
-            x <- ny_layer (net, data_dir = data_dir, k = k, quiet = TRUE,
+            x <- ny_layer (net, data_dir = data_dir, k = j, quiet = TRUE,
                            from = from [i], to = to [i])
             st <- formatC (as.numeric (difftime (Sys.time (), st0,
                                                  units = "sec")),
@@ -115,7 +115,7 @@ all_ny_layers <- function (net = NULL, k = 2:9 * 100, data_dir)
                                 paste0 ("flow-",
                                         substring (from [i], 1, 3), "-",
                                         substring (to [i], 1, 3), "-k",
-                                        k, ".Rds"))
+                                        j, ".Rds"))
             saveRDS (x, file = fname)
             message ("\r", msg, "; done in ", st, "s")
         }
@@ -129,7 +129,6 @@ format_time_int <- function (st0)
     hh <- floor (st / 3600)
     mm <- floor ((st - hh * 3600) / 60)
     ss <- st - hh * 3600 - mm * 60
-    hh <- sprintf ("%02d", hh)
     mm <- sprintf ("%02d", mm)
     ss <- sprintf ("%02d", ss)
     paste0 (hh, ":", mm, ":", ss)
