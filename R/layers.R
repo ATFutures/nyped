@@ -29,7 +29,7 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
     } else if (to == "dispersal")
         txt <- paste (txt, "dispersal from subway")
     else
-        txt <- paste (txt, "subway to ", to)
+        txt <- paste0 (txt, " subway to ", to)
 
     if (!quiet)
         message (cli::rule (center = txt, line = 2, col = "green"))
@@ -79,7 +79,7 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
     return (res)
 }
 
-#' all_ny_layer2
+#' all_ny_layers
 #'
 #' Calculate all flow layer of pedestrian densities for New York City, for a
 #' range of widths of exponential spatial interaction functions (`k`-values).
@@ -152,7 +152,7 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700,
                  appendLF = FALSE)
     v <- dodgr::dodgr_vertices (net)
 
-    a <- get_attractors (data_dir, type = to)
+    a <- get_attractors (data_dir, v, type = to)
 
     # calculate spatial interaction model between subway and attraction centres,
     # where the latter are weighted by number of centres allocated to each
@@ -229,11 +229,11 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700,
     return (p)
 }
 
-get_attractors <- function (data_dir, type = "education")
+get_attractors <- function (data_dir, v, type = "education")
 {
-    to <- match.arg (to, c ("residential", "education", "entertainment",
-                            "healthcare", "sustenance", "transportation",
-                            "dispersal"))
+    type <- match.arg (type, c ("residential", "education", "entertainment",
+                                "healthcare", "sustenance", "transportation",
+                                "dispersal"))
     a <- readRDS (file.path (data_dir, "osm", "ny-attractors.Rds"))
     # The attractors data contains lots of points outside the bbox of the street
     # network, so have to be reduced to only those within. (Otherwise *ALL*
