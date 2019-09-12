@@ -143,6 +143,14 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700,
     v <- dodgr::dodgr_vertices (net)
 
     a <- readRDS (file.path (data_dir, "osm", "ny-attractors.Rds"))
+    # The attractors data contains lots of points outside the bbox of the street
+    # network, so have to be reduced to only those within. (Otherwise *ALL*
+    # points beyond get aggregated to nearest points, producing anomalously huge
+    # values at boundaries.)
+    pts <- sf::st_as_sf (a, coords = c ("x", "y"), crs = 4326)
+    bb <- osmdata::getbb ("new york city", format_out = "sf_polygon")
+    suppressMessages (index <- sf::st_contains (bb, pts) [[1]])
+    a <- a [index, ]
     # a has OSM id's, but these need to be re-matched to values in the actual
     # street network
     a$id <- v$id [dodgr::match_points_to_graph (v, a [, c ("x", "y")])]
