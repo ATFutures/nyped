@@ -5,8 +5,9 @@
 #' @param net Weighted street network; loaded from `data_dir` if not provided
 #' @param from Category of origins for pedestrian flows; one of "subway" or
 #' "residential"
-#' @param to Category of destinations for pedestrian flows; one of "activity",
-#' "parking", "residential", or anything else to estimate dispersal.
+#' @param to Category of destinations for pedestrian flows; one of
+#' "residential", "education", "entertainment", "healthcare", "sustenance",
+#' "transportation", or "dispersal" for a general dispersal model.
 #' @param k Width of exponential decay (in m) for spatial interaction models
 #' @param data_dir The directory in which data are to be, or have previously
 #' been, downloaded.
@@ -15,19 +16,21 @@
 ny_layer <- function (net = NULL, from = "subway", to = "activity",
                       k = 700, data_dir, quiet = FALSE)
 {
+    to <- match.arg (to, c ("residential", "education", "entertainment",
+                            "healthcare", "sustenance", "transportation",
+                            "dispersal"))
+    from <- match.arg (from, c ("subway", "residential"))
+
     txt <- "New York pedestrian calibration:"
     if (from == "residential")
     {
         to <- "subway"
         txt <- paste (txt, "residential to subway")
-    } else if (to == "activity")
-        txt <- paste (txt, "subway to activity centres")
-    else if (to == "parking")
-        txt <- paste (txt, "subway to parking")
-    else if (to == "residential")
-        txt <- paste (txt, "subway to residential")
-    else
+    } else if (to == "dispersal")
         txt <- paste (txt, "dispersal from subway")
+    else
+        txt <- paste (txt, "subway to ", to)
+
     if (!quiet)
         message (cli::rule (center = txt, line = 2, col = "green"))
 
@@ -60,14 +63,13 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
     else if (to == "residential")
         res <- layer_subway_res (net, data_dir, p, s, k = k, reverse = FALSE,
                                  quiet = quiet)
-    else if (to == "activity")
-        res <- layer_subway_attr (net, data_dir, p, s, k = k, quiet = quiet)
-    else if (to == "parking")
-        res <- layer_subway_attr (net, data_dir, p, s, k = k, parking = TRUE,
-                                  quiet = quiet)
-    else
+    else if (to == "disperse")
         res <- layer_subway_disperse (net, data_dir, p, s, k = k,
                                       quiet = quiet)
+    else 
+        res <- layer_subway_attr (net, data_dir, p, s, k = k, quiet = quiet,
+                                  to = to)
+
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
     if (!quiet)
@@ -90,8 +92,16 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
 #' @export
 all_ny_layers <- function (net = NULL, k = 2:9 * 100, data_dir)
 {
-    from <- c ("residential", rep ("subway", 4))
-    to <- c ("subway", "activity", "parking", "residential", "disperse")
+    to <- c ("residential", "education", "entertainment", "healthcare",
+             "sustenance", "transportation", "disperse")
+    from <- rep ("subway", length (to))
+    to <- c ("subway", to)
+    from <- c ("residential", from)
+
+    # temporary reduction
+    to <- c ("education", "entertainment", "healthcare", "sustenance")
+    from <- rep ("subway", length (to))
+
     my_arrow <- paste0 (cli::symbol$em_dash, cli::symbol$arrow_right)
     t0 <- Sys.time ()
     for (i in seq (from))
@@ -135,45 +145,14 @@ format_time_int <- function (st0)
 }
 
 layer_subway_attr <- function (net, data_dir, p, s, k = 700,
-                               parking = FALSE, quiet = FALSE)
+                               quiet = FALSE, to = "dispersal")
 {
     if (!quiet)
         message (cli::symbol$pointer, " Preparing spatial interaction matrices",
                  appendLF = FALSE)
     v <- dodgr::dodgr_vertices (net)
 
-    a <- readRDS (file.path (data_dir, "osm", "ny-attractors.Rds"))
-    # The attractors data contains lots of points outside the bbox of the street
-    # network, so have to be reduced to only those within. (Otherwise *ALL*
-    # points beyond get aggregated to nearest points, producing anomalously huge
-    # values at boundaries.)
-    pts <- sf::st_as_sf (a, coords = c ("x", "y"), crs = 4326)
-    bb <- osmdata::getbb ("new york city", format_out = "sf_polygon")
-    suppressMessages (index <- sf::st_contains (bb, pts) [[1]])
-    a <- a [index, ]
-    # a has OSM id's, but these need to be re-matched to values in the actual
-    # street network
-    a$id <- v$id [dodgr::match_points_to_graph (v, a [, c ("x", "y")])]
-    id <- capacity <- NULL # no visible binding note
-    if (!parking)
-    {
-        a <- a [a$category != "transportation", ]
-        a <- dplyr::select (a, c ("id", "x", "y")) %>%
-            dplyr::group_by (id) %>%
-            dplyr::summarise (n = length (id))
-    } else
-    {
-        a <- a [a$category == "transportation", ]
-        suppressWarnings (a$capacity <- as.integer (a$capacity))
-        a$capacity [is.na (a$capacity)] <- stats::median (a$capacity, na.rm = TRUE)
-        a <- dplyr::select (a, c ("id", "capacity")) %>%
-            dplyr::group_by (id) %>%
-            dplyr::summarise (n = sum (capacity))
-    }
-    # then put the coordinates back from the graph vertices
-    index <- match (a$id, v$id)
-    a$x <- v$x [index]
-    a$y <- v$y [index]
+    a <- get_attractors (data_dir, type = to)
 
     # calculate spatial interaction model between subway and attraction centres,
     # where the latter are weighted by number of centres allocated to each
@@ -248,6 +227,56 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700,
 
     p$flows <- flows
     return (p)
+}
+
+get_attractors <- function (data_dir, type = "education")
+{
+    to <- match.arg (to, c ("residential", "education", "entertainment",
+                            "healthcare", "sustenance", "transportation",
+                            "dispersal"))
+    a <- readRDS (file.path (data_dir, "osm", "ny-attractors.Rds"))
+    # The attractors data contains lots of points outside the bbox of the street
+    # network, so have to be reduced to only those within. (Otherwise *ALL*
+    # points beyond get aggregated to nearest points, producing anomalously huge
+    # values at boundaries.)
+    pts <- sf::st_as_sf (a, coords = c ("x", "y"), crs = 4326)
+    bb <- osmdata::getbb ("new york city", format_out = "sf_polygon")
+    suppressMessages (index <- sf::st_contains (bb, pts) [[1]])
+    a <- a [index, ]
+    # a has OSM id's, but these need to be re-matched to values in the actual
+    # street network
+    a$id <- v$id [dodgr::match_points_to_graph (v, a [, c ("x", "y")])]
+    id <- capacity <- NULL # no visible binding note
+    a <- a [a$category == type, ]
+    if (type == "transportation")
+    {
+        a <- a [a$category == "transportation", ]
+        suppressWarnings (a$capacity <- as.integer (a$capacity))
+        # get median size of parking facilities to replace NA values
+        index <- grep ("parking", a$amenity)
+        med_parks <- stats::median (a$capacity [index], na.rm = TRUE)
+        a$capacity [index] [is.na (a$capacity [index])] <- med_parks
+        # all other non-parking transportation give n = 1
+        index <- seq (nrow (a)) [which (!seq (nrow (a))) %in% index]
+        a$capacity [index, ] <- 1
+        a <- dplyr::select (a, c ("id", "capacity")) %>%
+            dplyr::group_by (id) %>%
+            dplyr::summarise (n = sum (capacity))
+    } else
+    {
+        if (type == "entertainment")
+            a <- a [a$amenity != "fountain", ]
+
+        a <- dplyr::select (a, c ("id", "x", "y")) %>%
+            dplyr::group_by (id) %>%
+            dplyr::summarise (n = length (id))
+    }
+    # then put the coordinates back from the graph vertices
+    index <- match (a$id, v$id)
+    a$x <- v$x [index]
+    a$y <- v$y [index]
+
+    return (a)
 }
 
 layer_subway_disperse <- function (net, data_dir, p, s, k = 700,
