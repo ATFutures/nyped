@@ -7,7 +7,7 @@
 #' "residential"
 #' @param to Category of destinations for pedestrian flows; one of
 #' "residential", "education", "entertainment", "healthcare", "sustenance",
-#' "transportation", or "dispersal" for a general dispersal model.
+#' "transportation", or "disperse" for a general dispersal model.
 #' @param k Width of exponential decay (in m) for spatial interaction models
 #' @param data_dir The directory in which data are to be, or have previously
 #' been, downloaded.
@@ -18,7 +18,7 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
 {
     to <- match.arg (to, c ("residential", "education", "entertainment",
                             "healthcare", "sustenance", "transportation",
-                            "dispersal"))
+                            "disperse", "subway"))
     from <- match.arg (from, c ("subway", "residential"))
 
     txt <- "New York pedestrian calibration:"
@@ -26,7 +26,7 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
     {
         to <- "subway"
         txt <- paste (txt, "residential to subway")
-    } else if (to == "dispersal")
+    } else if (to == "disperse")
         txt <- paste (txt, "dispersal from subway")
     else
         txt <- paste0 (txt, " subway to ", to)
@@ -145,7 +145,7 @@ format_time_int <- function (st0)
 }
 
 layer_subway_attr <- function (net, data_dir, p, s, k = 700,
-                               quiet = FALSE, to = "dispersal")
+                               quiet = FALSE, to = "disperse")
 {
     if (!quiet)
         message (cli::symbol$pointer, " Preparing spatial interaction matrices",
@@ -233,7 +233,7 @@ get_attractor_layer <- function (data_dir, v, type = "education")
 {
     type <- match.arg (type, c ("residential", "education", "entertainment",
                                 "healthcare", "sustenance", "transportation",
-                                "dispersal"))
+                                "disperse"))
     a <- readRDS (file.path (data_dir, "osm", "ny-attractors.Rds"))
     # The attractors data contains lots of points outside the bbox of the street
     # network, so have to be reduced to only those within. (Otherwise *ALL*
@@ -250,7 +250,6 @@ get_attractor_layer <- function (data_dir, v, type = "education")
     a <- a [a$category == type, ]
     if (type == "transportation")
     {
-        a <- a [a$category == "transportation", ]
         suppressWarnings (a$capacity <- as.integer (a$capacity))
         # get median size of parking facilities to replace NA values
         index <- grep ("parking", a$amenity)
@@ -258,7 +257,8 @@ get_attractor_layer <- function (data_dir, v, type = "education")
         a$capacity [index] [is.na (a$capacity [index])] <- med_parks
         # all other non-parking transportation give n = 1
         index <- seq (nrow (a)) [which (!seq (nrow (a))) %in% index]
-        a$capacity [index, ] <- 1
+        if (length (index) > 0)
+            a$capacity [index, ] <- 1
         a <- dplyr::select (a, c ("id", "capacity")) %>%
             dplyr::group_by (id) %>%
             dplyr::summarise (n = sum (capacity))
