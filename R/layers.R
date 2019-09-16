@@ -18,23 +18,17 @@
 ny_layer <- function (net = NULL, from = "subway", to = "activity",
                       k = 700, k_scale = 0, data_dir, quiet = FALSE)
 {
-    to <- match.arg (to, c ("residential", "education", "entertainment",
-                            "healthcare", "sustenance", "transportation",
-                            "disperse", "subway"))
-    from <- match.arg (from, c ("subway", "residential"))
+    targets <- c ("residential", "education", "entertainment", "healthcare",
+                  "sustenance", "transportation", "disperse", "subway")
+    to <- match.arg (to, targets)
+    from <- match.arg (from, targets)
 
-    txt <- "New York pedestrian calibration:"
     if (from == "residential")
-    {
         to <- "subway"
-        txt <- paste (txt, "residential to subway")
-    } else if (to == "disperse")
-        txt <- paste (txt, "dispersal from subway")
-    else
-        txt <- paste0 (txt, " subway to ", to)
 
     if (!quiet)
-        message (cli::rule (center = txt, line = 2, col = "green"))
+        message (cli::rule (center = get_header_txt (from, to),
+                            line = 2, col = "green"))
 
     st0 <- Sys.time ()
     if (is.null (net))
@@ -50,33 +44,35 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
             message ("\r", cli::symbol$tick, " Weighted street network ")
     }
 
-    p <- ped_osm_id (net = net, quiet = TRUE)
-    s <- subway_osm_id (net = net, quiet = TRUE)
-
-    if (!quiet)
-        message (cli::symbol$pointer, " Contracting street network",
-                 appendLF = FALSE)
-    net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
-    if (!quiet)
-        message ("\r", cli::symbol$tick, " Contracted street network ")
-
-    res <- get_layer (net, data_dir, from, to, k, k_scale, p, s, quiet)
+    chk <- is_layer_cached (data_dir, from, to, k, k_scale)
+    res <- get_layer (net, data_dir, from, to, k, k_scale, quiet)
 
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
-    if (!quiet)
+    if (!quiet & !chk)
         message (cli::rule (center = paste0 ("Finished in ", st, "s"),
                             line = 2, col = "green"))
 
     return (res)
 }
 
-get_layer <- function (net, data_dir, from, to, k, k_scale, p, s, quiet)
+get_header_txt <- function (from, to)
 {
-    cache_dir <- file.path (data_dir, "calibration")
-    f <- paste0 ("flow-", substr (from, 1, 3), "-", substr (to, 1, 3),
-                 "-k", k, "-s", k_scale, ".Rds")
-    f <- file.path (data_dir, f)
+    txt <- "New York pedestrian calibration:"
+
+    if (from == "residential")
+        txt <- paste (txt, "residential to subway")
+    else if (to == "disperse")
+        txt <- paste (txt, "dispersal from subway")
+    else
+        txt <- paste0 (txt, " subway to ", to)
+
+    return (txt)
+}
+
+get_layer <- function (net, data_dir, from, to, k, k_scale, quiet)
+{
+    f <- get_file_name (data_dir, from, to, k, k_scale)
 
     if (file.exists (f))
     {
@@ -84,9 +80,41 @@ get_layer <- function (net, data_dir, from, to, k, k_scale, p, s, quiet)
             message (cli::symbol$tick, " Loaded cached layer")
         res <- readRDS (f)
     } else
+    {
+        p <- ped_osm_id (net = net, quiet = TRUE)
+        s <- subway_osm_id (net = net, quiet = TRUE)
+
+        if (!quiet)
+            message (cli::symbol$pointer, " Contracting street network",
+                     appendLF = FALSE)
+        net <- dodgr::dodgr_contract_graph (net,
+                                            verts = unique (c (p$id, s$id)))
+        if (!quiet)
+            message ("\r", cli::symbol$tick, " Contracted street network ")
+
         res <- calc_layer (net, data_dir, from, to, k, k_scale, p, s, quiet)
+    }
 
     return (res)
+}
+
+get_file_name <- function (data_dir, from, to, k, k_scale)
+{
+    prfx <- ""
+    if (k_scale < 0)
+    {
+        k_scale <- abs (k_scale)
+        prfx <- "n"
+    }
+    ks_p <- sprintf ("%s%03d", prfx, round (k_scale * 100))
+    f <- paste0 ("flow-", substr (from, 1, 3), "-", substr (to, 1, 3),
+                 "-k", k, "-s", ks_p, ".Rds")
+    f <- file.path (data_dir, "calibration", f)
+}
+
+is_layer_cached <- function (data_dir, from, to, k, k_scale)
+{
+    file.exists (get_file_name (data_dir, from, to, k, k_scale))
 }
 
 calc_layer <- function (net, data_dir, from, to, k, k_scale, p, s, quiet)
@@ -100,9 +128,12 @@ calc_layer <- function (net, data_dir, from, to, k, k_scale, p, s, quiet)
     else if (to == "disperse")
         res <- layer_subway_disperse (net, data_dir, p, s, k = k,
                                       k_scale = k_scale, quiet = quiet)
-    else 
-        res <- layer_subway_attr (net, data_dir, p, s, k = k, k_scale = k_scale,
-                                  quiet = quiet, to = to)
+    else if (from == "subway")
+        res <- layer_subway_attr (net, to = to, data_dir, p, s,
+                                  k = k, k_scale = k_scale, quiet = quiet)
+    else
+        res <- layer_attr_attr (net, from = from, to = to, data_dir, p, s,
+                                k = k, k_scale = k_scale, quiet = quiet)
 
     cache_layer (res, data_dir, from, to, k, k_scale)
 
@@ -111,10 +142,10 @@ calc_layer <- function (net, data_dir, from, to, k, k_scale, p, s, quiet)
 
 cache_layer <- function (res, data_dir, from, to, k, k_scale)
 {
-    cache_dir <- file.path (data_dir, "calibration")
-    f <- paste0 ("flow-", substr (from, 1, 3), "-", substr (to, 1, 3),
-                 "-k", k, "-s", k_scale, ".Rds")
-    f <- file.path (data_dir, f)
+    # save only id and flow columns - this removes (X,Y) + pedestrian count cols
+    res <- res [, c ("id", "flows")]
+
+    f <- get_file_name (data_dir, from, to, k, k_scale)
     saveRDS (res, f)
 }
 
@@ -184,8 +215,8 @@ format_time_int <- function (st0)
     paste0 (hh, ":", mm, ":", ss)
 }
 
-layer_subway_attr <- function (net, data_dir, p, s, k = 700, k_scale = 0,
-                               quiet = FALSE, to = "disperse")
+layer_subway_attr <- function (net, to = "disperse", data_dir, p, s,
+                               k = 700, k_scale = 0, quiet = FALSE)
 {
     k = k ^ (1 + k_scale * s$count2018 / max (s$count2018))
 
@@ -223,6 +254,96 @@ layer_subway_attr <- function (net, data_dir, p, s, k = 700, k_scale = 0,
     }
     st0 <- Sys.time ()
     net_f <- dodgr::dodgr_flows_aggregate (net, from = s$id, to = a$id,
+                                           flows = fmat)
+    st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
+                   format = "f", digits = 1)
+    if (!quiet)
+    {
+        message ("\r", cli::symbol$tick, " Aggregated flows in ", st, "s")
+
+        message (cli::symbol$pointer,
+                 " Aligning flows to pedestrian count points",
+                 appendLF = FALSE)
+    }
+    flows <- rep (NA, nrow (p))
+    # dlim <- 12 * k # limit of exp (-d / k) = 1e-12
+    # This is only used in the commented-out lines below for cutting the graph
+
+    # Calculate dmat from all pedestrian count points
+    dp <- dodgr::dodgr_dists (net, from = p$id)
+
+    for (i in seq (nrow (p)))
+    {
+        # find edges that flow in and out of that point - these commonly return
+        # only NA values, so second approach is implemented
+        i1 <- which (net_f$.vx0 == p$id [i])
+        i2 <- which (net_f$.vx1 == p$id [i])
+        flows [i] <- sum (net_f$flow [i1], na.rm = TRUE) +
+            sum (net_f$flow [i2], na.rm = TRUE)
+
+        # OR: choose first edges near that observation vertex that have non-zero
+        # flows
+        if (flows [i] == 0)
+        {
+            di <- dp [i, ] [order (dp [i, ])]
+            f_ord <- net_f$flow [match (net_f$.vx0, names (di))]
+            flow0 <- f_ord [which (f_ord > 0)] [1]
+            f_ord <- net_f$flow [match (net_f$.vx1, names (di))]
+            flow1 <- f_ord [which (f_ord > 0)] [1]
+            flows [i] <- flow0 + flow1
+        }
+    }
+
+    if (!quiet)
+        message ("\r", cli::symbol$tick,
+                 " Aligned flows to pedestrian count points ")
+
+    p$flows <- flows
+    return (p)
+}
+
+layer_attr_attr <- function (net, from = "health", to = "disperse", data_dir,
+                             p, s, k = 700, k_scale = 0, quiet = FALSE)
+{
+    if (!quiet)
+        message (cli::symbol$pointer, " Preparing spatial interaction matrices",
+                 appendLF = FALSE)
+    v <- dodgr::dodgr_vertices (net)
+
+    fr_a <- get_attractor_layer (data_dir, v, type = from)
+    to_a <- get_attractor_layer (data_dir, v, type = to)
+    nfr <- nrow (fr_a)
+    nto <- nrow (to_a)
+
+    k = k ^ (1 + k_scale * fr_a$n / max (fr_a$n))
+    kmat <- matrix (k, nrow = nfr, ncol = nto)
+
+    # calculation spatial interaction model between from and to centres,
+    # weighting both by numbers of centres allocated to each contracted vertex.
+    fr_mat <- matrix (fr_a$n, nrow = nfr, ncol = nto)
+    to_mat <- t (matrix (as.double (to_a$n), nrow = nto, ncol = nfr))
+    dmat <- dodgr::dodgr_dists (net, from = fr_a$id, to = to_a$id)
+    dmat [is.na (dmat)] <- max (dmat, na.rm = TRUE)
+
+    # Double-constrain interaction matrix to unit sum over all possible
+    # origins and destinations. For each origin (row), the sum over all
+    # destinations (columns) has to equal one:
+    fmat <- fr_mat * exp (-dmat / kmat)
+    cmat <- t (matrix (colSums (fmat), nrow = nto, ncol = nfr))
+    fmat <- fmat / cmat
+    # Each origin (row) should then only allocate the total amount to all
+    # destinations (columns), so fmat is multiplied by fr_mat divided by
+    # ncol (to_mat) == nto
+    fmat <- fr_mat * fmat / nto
+
+    if (!quiet)
+    {
+        message ("\r", cli::symbol$tick,
+                 " Prepared spatial interaction matrices  ")
+        message (cli::symbol$pointer, " Aggregating flows ", appendLF = FALSE)
+    }
+    st0 <- Sys.time ()
+    net_f <- dodgr::dodgr_flows_aggregate (net, from = fr_a$id, to = to_a$id,
                                            flows = fmat)
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
@@ -343,7 +464,7 @@ layer_subway_disperse <- function (net, data_dir, p, s, k = 700, k_scale = 0,
         message ("\r", cli::symbol$tick, " Dispersed flows in ", st, "s")
 
         message (cli::symbol$pointer,
-                 " Aligning flows to pedestrian count points")
+                 " Aligning flows to pedestrian count points", appendLF = FALSE)
     }
     flows <- rep (NA, nrow (p))
 
