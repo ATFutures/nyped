@@ -9,12 +9,14 @@
 #' "residential", "education", "entertainment", "healthcare", "sustenance",
 #' "transportation", or "disperse" for a general dispersal model.
 #' @param k Width of exponential decay (in m) for spatial interaction models
+#' @param k_scale Scale `k` to size of origins (`s`), so `k = k ^ (1 + s /
+#' smax)`.
 #' @param data_dir The directory in which data are to be, or have previously
 #' been, downloaded.
 #' @param quiet If `FALSE`, display progress information on screen
 #' @export
 ny_layer <- function (net = NULL, from = "subway", to = "activity",
-                      k = 700, data_dir, quiet = FALSE)
+                      k = 700, k_scale = 0, data_dir, quiet = FALSE)
 {
     to <- match.arg (to, c ("residential", "education", "entertainment",
                             "healthcare", "sustenance", "transportation",
@@ -50,6 +52,7 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
 
     p <- ped_osm_id (net = net, quiet = TRUE)
     s <- subway_osm_id (net = net, quiet = TRUE)
+
     if (!quiet)
         message (cli::symbol$pointer, " Contracting street network",
                  appendLF = FALSE)
@@ -58,17 +61,17 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
         message ("\r", cli::symbol$tick, " Contracted street network ")
 
     if (from == "residential")
-        res <- layer_subway_res (net, data_dir, p, s, k = k, reverse = TRUE,
-                                 quiet = quiet)
+        res <- layer_subway_res (net, data_dir, p, s, k = k, k_scale = k_scale,
+                                 reverse = TRUE, quiet = quiet)
     else if (to == "residential")
-        res <- layer_subway_res (net, data_dir, p, s, k = k, reverse = FALSE,
-                                 quiet = quiet)
+        res <- layer_subway_res (net, data_dir, p, s, k = k, k_scale = k_scale,
+                                 reverse = FALSE, quiet = quiet)
     else if (to == "disperse")
         res <- layer_subway_disperse (net, data_dir, p, s, k = k,
-                                      quiet = quiet)
+                                      k_scale = k_scale, quiet = quiet)
     else 
-        res <- layer_subway_attr (net, data_dir, p, s, k = k, quiet = quiet,
-                                  to = to)
+        res <- layer_subway_attr (net, data_dir, p, s, k = k, k_scale = k_scale,
+                                  quiet = quiet, to = to)
 
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
@@ -92,6 +95,7 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
 #' @export
 all_ny_layers <- function (net = NULL, k = 2:9 * 100, data_dir)
 {
+    # NOTE: At the moment, these all use k_scale = 0
     to <- c ("residential", "education", "entertainment", "healthcare",
              "sustenance", "transportation", "disperse")
     from <- rep ("subway", length (to))
@@ -144,9 +148,11 @@ format_time_int <- function (st0)
     paste0 (hh, ":", mm, ":", ss)
 }
 
-layer_subway_attr <- function (net, data_dir, p, s, k = 700,
+layer_subway_attr <- function (net, data_dir, p, s, k = 700, k_scale = 0,
                                quiet = FALSE, to = "disperse")
 {
+    k = k ^ (1 + k_scale * s$count2018 / max (s$count2018))
+
     if (!quiet)
         message (cli::symbol$pointer, " Preparing spatial interaction matrices",
                  appendLF = FALSE)
@@ -279,9 +285,11 @@ get_attractor_layer <- function (data_dir, v, type = "education")
     return (a)
 }
 
-layer_subway_disperse <- function (net, data_dir, p, s, k = 700,
+layer_subway_disperse <- function (net, data_dir, p, s, k = 700, k_scale = 0,
                                    quiet = FALSE)
 {
+    k = k ^ (1 + k_scale * s$count2018 / max (s$count2018))
+
     if (!quiet)
         message (cli::symbol$pointer, " Dispersing flows ", appendLF = FALSE)
     v <- dodgr::dodgr_vertices (net)
@@ -328,9 +336,11 @@ layer_subway_disperse <- function (net, data_dir, p, s, k = 700,
 # weighted by subway counts and destinations by population density.
 # reverse calculates flows from residential areas to subways, with destinations
 # (subways) simply weighted equally and *NOT* by subway counts
-layer_subway_res <- function (net, data_dir, p, s, k = 700, reverse = FALSE,
-                              quiet = FALSE)
+layer_subway_res <- function (net, data_dir, p, s, k = 700, k_scale = 0,
+                              reverse = FALSE, quiet = FALSE)
 {
+    k = k ^ (1 + k_scale * s$count2018 / max (s$count2018))
+
     if (!quiet)
         message (cli::symbol$pointer, " Preparing residential density data ",
                  appendLF = FALSE)

@@ -5,7 +5,7 @@
 \title{ny_layer}
 \usage{
 ny_layer(net = NULL, from = "subway", to = "activity", k = 700,
-  data_dir, quiet = FALSE)
+  k_scale = 0, data_dir, quiet = FALSE)
 }
 \arguments{
 \item{net}{Weighted street network; loaded from `data_dir` if not provided}
@@ -15,9 +15,12 @@ ny_layer(net = NULL, from = "subway", to = "activity", k = 700,
 
 \item{to}{Category of destinations for pedestrian flows; one of
 "residential", "education", "entertainment", "healthcare", "sustenance",
-"transportation", or "dispersal" for a general dispersal model.}
+"transportation", or "disperse" for a general dispersal model.}
 
 \item{k}{Width of exponential decay (in m) for spatial interaction models}
+
+\item{k_scale}{Scale `k` to size of origins (`s`), so `k = k ^ (1 + s /
+smax)`.}
 
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
