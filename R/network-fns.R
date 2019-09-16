@@ -10,27 +10,35 @@
 #' @export
 ped_osm_id <- function (data_dir, net = NULL, quiet = FALSE)
 {
-    p <- nyped_data (quiet = quiet)
-    xy <- data.frame (sf::st_coordinates (p$geometry))
+    f <- file.path (data_dir, "calibration", "ped-osm-id.Rds")
+    if (file.exists (f))
+        xy <- readRDS (f)
+    else
+    {
+        p <- nyped_data (quiet = quiet)
+        xy <- data.frame (sf::st_coordinates (p$geometry))
 
-    if (is.null (net))
-        net <- get_ny_network (data_dir)
+        if (is.null (net))
+            net <- get_ny_network (data_dir)
 
-    v <- dodgr::dodgr_vertices (net)
-    xy$id <- v$id [dodgr::match_points_to_graph (v, xy)]
-    xy$weekday <- p$weekday
-    xy$weekend <- p$weekend
-    xy$week <- p$week
+        v <- dodgr::dodgr_vertices (net)
+        xy$id <- v$id [dodgr::match_points_to_graph (v, xy)]
+        xy$weekday <- p$weekday
+        xy$weekend <- p$weekend
+        xy$week <- p$week
 
-    # There are 2 counters which map on to the same OSM ID, so:
-    id <- names (table (xy$id) [which (table (xy$id) == 2)])
-    index <- which (xy$id == id)
-    i <- which.max (xy$week [index])
-    xy$weekday [index [i]] <- sum (xy$weekday [index])
-    xy$weekend [index [i]] <- sum (xy$weekend [index])
-    xy$week [index [i]] <- sum (xy$week [index])
-    index <- seq (nrow (xy)) [!seq (nrow (xy)) %in% index [-i]]
-    xy <- xy [index, ]
+        # There are 2 counters which map on to the same OSM ID, so:
+        id <- names (table (xy$id) [which (table (xy$id) == 2)])
+        index <- which (xy$id == id)
+        i <- which.max (xy$week [index])
+        xy$weekday [index [i]] <- sum (xy$weekday [index])
+        xy$weekend [index [i]] <- sum (xy$weekend [index])
+        xy$week [index [i]] <- sum (xy$week [index])
+        index <- seq (nrow (xy)) [!seq (nrow (xy)) %in% index [-i]]
+        xy <- xy [index, ]
+
+        saveRDS (xy, file = f)
+    }
 
     return (xy)
 }
@@ -55,15 +63,24 @@ get_ny_network <- function (data_dir)
 #' @export
 subway_osm_id <- function (data_dir, net = NULL, quiet = FALSE)
 {
-    if (is.null (net))
-        net <- get_ny_network (data_dir)
+    f <- file.path (data_dir, "calibration", "sub-osm-id.Rds")
+    if (file.exists (f))
+        s <- readRDS (f)
+    else
+    {
+        if (is.null (net))
+            net <- get_ny_network (data_dir)
 
-    s <- nysubway_data (quiet = quiet)
-    s$count2018 <- s$count2018 / 365000 # convert to 1000's per day
-    sxy <- sf::st_coordinates (s$geom)
-    v <- dodgr::dodgr_vertices (net)
-    s$id <- v$id [dodgr::match_points_to_graph (v, sxy)]
-    s [which (s$id %in% v$id), ]
+        s <- nysubway_data (quiet = quiet)
+        s$count2018 <- s$count2018 / 365000 # convert to 1000's per day
+        sxy <- sf::st_coordinates (s$geom)
+        v <- dodgr::dodgr_vertices (net)
+        s$id <- v$id [dodgr::match_points_to_graph (v, sxy)]
+        s [which (s$id %in% v$id), ]
+
+        saveRDS (s, file = f)
+    }
+    return (s)
 }
 
 #' cut_network_to_pts

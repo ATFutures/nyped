@@ -85,8 +85,8 @@ get_layer <- function (net, data_dir, from, to, k, k_scale, quiet)
         res <- readRDS (f)
     } else
     {
-        p <- ped_osm_id (net = net, quiet = TRUE)
-        s <- subway_osm_id (net = net, quiet = TRUE)
+        p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
+        s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
 
         if (!quiet)
             message (cli::symbol$pointer, " Contracting street network",
@@ -365,7 +365,7 @@ layer_disperse <- function (net, from = "subway", data_dir, p, s,
 {
     v <- dodgr::dodgr_vertices (net)
 
-    if (from == subway)
+    if (from == "subway")
     {
         k = k ^ (1 + k_scale * s$count2018 / max (s$count2018))
         dens <- s$count2018
@@ -706,8 +706,10 @@ fit_one_layer <- function (net = NULL, from = "subway", to = "activity",
 {
     res <- ny_layer (net = net, from = from, to = to, k = k, k_scale = k_scale,
                      data_dir = data_dir, quiet = quiet)
-    p <- ped_osm_id (net = net, quiet = TRUE)
+    p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     mod <- summary (lm (p$week ~ res$flows))
-    c (r2 = mod$r.squared,
-       ss = sum (mod$residuals ^ 2) / length (mod$residuals)) / 1e6
+    c (k = k,
+       k_scale = k_scale,
+       r2 = mod$adj.r.squared,
+       ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6)
 }
