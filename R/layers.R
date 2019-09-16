@@ -60,6 +60,37 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
     if (!quiet)
         message ("\r", cli::symbol$tick, " Contracted street network ")
 
+    res <- get_layer (net, data_dir, from, to, k, k_scale, p, s, quiet)
+
+    st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
+                   format = "f", digits = 1)
+    if (!quiet)
+        message (cli::rule (center = paste0 ("Finished in ", st, "s"),
+                            line = 2, col = "green"))
+
+    return (res)
+}
+
+get_layer <- function (net, data_dir, from, to, k, k_scale, p, s, quiet)
+{
+    cache_dir <- file.path (data_dir, "calibration")
+    f <- paste0 ("flow-", substr (from, 1, 3), "-", substr (to, 1, 3),
+                 "-k", k, "-s", k_scale, ".Rds")
+    f <- file.path (data_dir, f)
+
+    if (file.exists (f))
+    {
+        if (!quiet)
+            message (cli::symbol$tick, " Loaded cached layer")
+        res <- readRDS (f)
+    } else
+        res <- calc_layer (net, data_dir, from, to, k, k_scale, p, s, quiet)
+
+    return (res)
+}
+
+calc_layer <- function (net, data_dir, from, to, k, k_scale, p, s, quiet)
+{
     if (from == "residential")
         res <- layer_subway_res (net, data_dir, p, s, k = k, k_scale = k_scale,
                                  reverse = TRUE, quiet = quiet)
@@ -73,13 +104,18 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
         res <- layer_subway_attr (net, data_dir, p, s, k = k, k_scale = k_scale,
                                   quiet = quiet, to = to)
 
-    st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
-                   format = "f", digits = 1)
-    if (!quiet)
-        message (cli::rule (center = paste0 ("Finished in ", st, "s"),
-                            line = 2, col = "green"))
+    cache_layer (res, data_dir, from, to, k, k_scale)
 
     return (res)
+}
+
+cache_layer <- function (res, data_dir, from, to, k, k_scale)
+{
+    cache_dir <- file.path (data_dir, "calibration")
+    f <- paste0 ("flow-", substr (from, 1, 3), "-", substr (to, 1, 3),
+                 "-k", k, "-s", k_scale, ".Rds")
+    f <- file.path (data_dir, f)
+    saveRDS (res, f)
 }
 
 #' all_ny_layers
