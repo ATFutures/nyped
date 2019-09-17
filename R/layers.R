@@ -13,10 +13,12 @@
 #' smax)`.
 #' @param data_dir The directory in which data are to be, or have previously
 #' been, downloaded.
+#' @param cache If `TRUE`, layers are cached in a sub-directory of `data_dir`
+#' for later reloading.
 #' @param quiet If `FALSE`, display progress information on screen
 #' @export
 ny_layer <- function (net = NULL, from = "subway", to = "activity",
-                      k = 700, k_scale = 0, data_dir, quiet = FALSE)
+                      k = 700, k_scale = 0, data_dir, cache = TRUE, quiet = FALSE)
 {
     targets <- c ("residential", "education", "entertainment", "healthcare",
                   "sustenance", "transportation", "disperse", "subway")
@@ -44,8 +46,10 @@ ny_layer <- function (net = NULL, from = "subway", to = "activity",
             message ("\r", cli::symbol$tick, " Weighted street network ")
     }
 
-    chk <- is_layer_cached (data_dir, from, to, k, k_scale)
-    res <- get_layer (net, data_dir, from, to, k, k_scale, quiet)
+    chk <- FALSE
+    if (cache)
+        chk <- is_layer_cached (data_dir, from, to, k, k_scale)
+    res <- get_layer (net, data_dir, from, to, k, k_scale, cache, quiet)
 
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
@@ -74,11 +78,11 @@ get_header_txt <- function (from, to)
     return (txt)
 }
 
-get_layer <- function (net, data_dir, from, to, k, k_scale, quiet)
+get_layer <- function (net, data_dir, from, to, k, k_scale, cache, quiet)
 {
     f <- get_file_name (data_dir, from, to, k, k_scale)
 
-    if (file.exists (f))
+    if (file.exists (f) & cache)
     {
         if (!quiet)
             message (cli::symbol$tick, " Loaded cached layer")
@@ -96,7 +100,8 @@ get_layer <- function (net, data_dir, from, to, k, k_scale, quiet)
         if (!quiet)
             message ("\r", cli::symbol$tick, " Contracted street network ")
 
-        res <- calc_layer (net, data_dir, from, to, k, k_scale, p, s, quiet)
+        res <- calc_layer (net, data_dir, from, to, k, k_scale, p, s,
+                           cache, quiet)
     }
 
     return (res)
@@ -121,7 +126,7 @@ is_layer_cached <- function (data_dir, from, to, k, k_scale)
     file.exists (get_file_name (data_dir, from, to, k, k_scale))
 }
 
-calc_layer <- function (net, data_dir, from, to, k, k_scale, p, s, quiet)
+calc_layer <- function (net, data_dir, from, to, k, k_scale, p, s, cache, quiet)
 {
     if (from == "residential")
         res <- layer_subway_res (net, data_dir, p, s, k = k, k_scale = k_scale,
@@ -144,7 +149,8 @@ calc_layer <- function (net, data_dir, from, to, k, k_scale, p, s, quiet)
         res <- layer_attr_attr (net, from = from, to = to, data_dir, p, s,
                                 k = k, k_scale = k_scale, quiet = quiet)
 
-    cache_layer (res, data_dir, from, to, k, k_scale)
+    if (cache)
+        cache_layer (res, data_dir, from, to, k, k_scale)
 
     return (res)
 }
@@ -702,10 +708,11 @@ all_ny_layers <- function (net = NULL, k = 2:9 * 100, data_dir)
 #' fitted mode (divided by 1e6)
 #' @export
 fit_one_layer <- function (net = NULL, from = "subway", to = "activity",
-                           k = 700, k_scale = 0, data_dir, quiet = FALSE)
+                           k = 700, k_scale = 0, data_dir, cache = FALSE,
+                           quiet = FALSE)
 {
     res <- ny_layer (net = net, from = from, to = to, k = k, k_scale = k_scale,
-                     data_dir = data_dir, quiet = quiet)
+                     data_dir = data_dir, cache = cache, quiet = quiet)
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     mod <- summary (lm (p$week ~ res$flows))
     c (k = k,

@@ -5,7 +5,7 @@
 \title{ny_layer}
 \usage{
 ny_layer(net = NULL, from = "subway", to = "activity", k = 700,
-  k_scale = 0, data_dir, quiet = FALSE)
+  k_scale = 0, data_dir, cache = TRUE, quiet = FALSE)
 }
 \arguments{
 \item{net}{Weighted street network; loaded from `data_dir` if not provided}
@@ -24,6 +24,9 @@ smax)`.}
 
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
+
+\item{cache}{If `TRUE`, layers are cached in a sub-directory of `data_dir`
+for later reloading.}
 
 \item{quiet}{If `FALSE`, display progress information on screen}
 }
