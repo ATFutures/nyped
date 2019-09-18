@@ -451,7 +451,7 @@ layer_subway_res <- function (net, data_dir, p, s, k = 700, k_scale = 0,
 
     nodes_new <- get_popdens_data (v, data_dir)
 
-    dmat <- d_subway_res (net, s, nodes_new)
+    dmat <- d_subway_res (net, s, nodes_new, data_dir)
 
     kmat <- matrix (k, nrow = nrow (s), ncol = nrow (nodes_new))
 
@@ -538,7 +538,7 @@ get_popdens_data <- function (v, data_dir)
     return (res)
 }
 
-d_subway_res <- function (net, s, nodes_new)
+d_subway_res <- function (net, s, nodes_new, data_dir)
 {
     cache_dir <- file.path (data_dir, "calibration")
     f <- file.path (cache_dir, "dmat-subway-res.Rds")
@@ -714,7 +714,7 @@ fit_one_layer <- function (net = NULL, from = "subway", to = "activity",
     res <- ny_layer (net = net, from = from, to = to, k = k, k_scale = k_scale,
                      data_dir = data_dir, cache = cache, quiet = quiet)
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
-    mod <- summary (lm (p$week ~ res$flows))
+    mod <- summary (stats::lm (p$week ~ res$flows))
     c (k = k,
        k_scale = k_scale,
        r2 = mod$adj.r.squared,
