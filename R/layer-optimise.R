@@ -82,10 +82,12 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     #         niters, " in ", st, "s  ")
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
+    message ()
     message (cli::rule (center = paste0 ("Optimised fit after ",
                                          niters, " iterations and ",
                                          st, "s: (k, ks) = (", k, 
-                                         ", ", ks, ")")))
+                                         ", ", ks, ")"),
+                        line = 2, col = "green"))
     #parallel::stopCluster (cl)
 
     c ("k" = k, "k_scale" = ks)
