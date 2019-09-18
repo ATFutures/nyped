@@ -4,7 +4,7 @@
 \alias{optimise_layer}
 \title{optimise_layer}
 \usage{
-optimise_layer(net, from, to, data_dir = data_dir)
+optimise_layer(net, from = "subway", to = "disperse", data_dir)
 }
 \arguments{
 \item{net}{Weighted street network; loaded from `data_dir` if not provided}

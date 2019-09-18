@@ -4,7 +4,7 @@
 #' pedestrian densities
 #' @inheritParams ny_layer
 #' @export
-optimise_layer <- function (net, from, to, data_dir = data_dir)
+optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
 {
     txt <- paste0 ("Optimising model fit from ", from, " to ", to)
     message (cli::rule (center = txt, line = 2, col = "green"))
@@ -39,8 +39,7 @@ optimise_layer <- function (net, from, to, data_dir = data_dir)
     message ("\r", cli::symbol$tick,
              " Established initial model parameters in ", st, "s")
     k <- 10 * round (k / 10)
-    #ks <- round (ks, digits = 2) # that keeps all decimals, but just sets them to 0
-    ks <- round (ks * 100) / 100
+    ks <- round (ks * 100) / 100 # round(.,digits = 2) keeps all decimals
 
     # The main optimisation loop, which does not use optimise because the
     # functions are actually very noisy.
@@ -59,8 +58,9 @@ optimise_layer <- function (net, from, to, data_dir = data_dir)
     ##                         envir = environment ())
 
     kold <- ksold <- 1e12
-    st0 <- Sys.time ()
+    st1 <- Sys.time ()
     niters <- 1
+    message (cli::symbol$pointer, " Optimising fit ", appendLF = FALSE)
     while (!(k == kold & ks == ksold))
     {
         kold <- k
@@ -72,12 +72,20 @@ optimise_layer <- function (net, from, to, data_dir = data_dir)
         ksvals <- ks + (-5:5) / 100
         ks <- fit_one_ks (net, from, to, ks, k, data_dir, ksvals, fitk = FALSE)
 
-        st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
+        st <- formatC (as.numeric (difftime (Sys.time (), st1, units = "sec")),
                        format = "f", digits = 1)
-        message ("\r", cli::symbol$tick,
-                 " Iteration [", niters, " in ", st, "s")
+        message ("\r", cli::symbol$pointer, " Optimising fit; Iteration [",
+                 niters, " in ", st, "s]", appendLF = FALSE)
         niters <- niters + 1
     }
+    #message ("\r", cli::symbol$tick, "Optimised fit; Iteration [",
+    #         niters, " in ", st, "s  ")
+    st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
+                   format = "f", digits = 1)
+    message (cli::rule (center = paste0 ("Optimised fit after ",
+                                         niters, " iterations and ",
+                                         st, "s: (k, ks) = (", k, 
+                                         ", ", ks, ")")))
     #parallel::stopCluster (cl)
 
     c ("k" = k, "k_scale" = ks)
@@ -118,7 +126,12 @@ fit_one_ks <- function (net, from, to, ks, k, data_dir, kvals, fitk = TRUE)
         index <- which (abs (mod$residuals) <= sdlim)
         x2 <- x [index]
         y <- ss [index]
-        suppressWarnings (mod <- stats::loess (y ~ x2, span = lspan))
+        mod2 <- tryCatch ({
+            stats::loess (y ~ x2, span = lspan)},
+            warning = function (w) { NULL },
+            error = function (e) { NULL })
+        if (!is.null (mod2))
+            mod <- mod2
         fit <- stats::predict (mod, newdata = data.frame (x2 = x))
         res <- x [which.min (fit)]
     } else
