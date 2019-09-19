@@ -88,7 +88,7 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
         if (niters > 10)
             break
     }
-    message ("\r", cli::symbol$tick, "Optimised fit; Iteration [",
+    message ("\r", cli::symbol$tick, " Optimised fit; Iteration [",
              niters, " in ", st, "s: (k, ks) = (", k, ", ", ks, ")")
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
