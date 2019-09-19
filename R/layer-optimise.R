@@ -61,6 +61,7 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     st1 <- Sys.time ()
     niters <- 1
     message (cli::symbol$pointer, " Optimising fit ", appendLF = FALSE)
+    opt <- FALSE
     while (!(k == kold & ks == ksold))
     {
         kold <- k
@@ -76,17 +77,24 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
                        format = "f", digits = 1)
         message ("\r", cli::symbol$pointer, " Optimising fit; Iteration [",
                  niters, " in ", st, "s]", appendLF = FALSE)
+
         niters <- niters + 1
+        if (k == kold & ks == ksold)
+            opt <- TRUE
+        if (niters > 10)
+            break
     }
     #message ("\r", cli::symbol$tick, "Optimised fit; Iteration [",
     #         niters, " in ", st, "s  ")
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
     message ()
-    message (cli::rule (center = paste0 ("Optimised fit after ",
-                                         niters, " iterations and ",
-                                         st, "s: (k, ks) = (", k, 
-                                         ", ", ks, ")"),
+    if (opt)
+        txt <- "Optimised fit after "
+    else
+        txt <- "Failed to optimise fit after "
+    message (cli::rule (center = paste0 (txt, niters, " iterations and ", st,
+                                         "s: (k, ks) = (", k, ", ", ks, ")"),
                         line = 2, col = "green"))
     #parallel::stopCluster (cl)
 
