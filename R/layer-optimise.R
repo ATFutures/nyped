@@ -53,10 +53,12 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     # The main optimisation loop, which does not use optimise because the
     # functions are actually very noisy.
 
-    nc <- parallel::detectCores () - 1
+    # parallel here appears to muck with the RcppParalllel operation of dodgr
+    # used for flow aggregation, so can't be (reliably) used.
+    #nc <- parallel::detectCores () - 1
     #nc <- floor (parallel::detectCores () / 2)
-    cl <- parallel::makeCluster (nc)
-    doParallel::registerDoParallel (nc)
+    #cl <- parallel::makeCluster (nc)
+    #doParallel::registerDoParallel (nc)
 
     kold <- ksold <- 1e12
     st1 <- Sys.time ()
@@ -97,7 +99,7 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     message (cli::rule (center = paste0 (txt, niters, " iterations and ", st,
                                          "s: (k, ks) = (", k, ", ", ks, ")"),
                         line = 2, col = "green"))
-    parallel::stopCluster (cl)
+    #parallel::stopCluster (cl)
 
     c ("k" = k, "k_scale" = ks)
 }
@@ -131,12 +133,13 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals, fitk = 
     i <- NULL # suppress no visible binding note
     if (to == "disperse")
     {
-        #for (i in seq (x)) {
-        #    ss [i] <- disperse_one_layer (net, fr_dat, ki [i], ksi [i],
-        #                                  p, dp) [4]
-        ss <- foreach::foreach (i = seq (x)) %dopar%
-            disperse_one_layer (net, fr_dat, ki [i], ksi [i], p, dp) [4]
-        ss <- unlist (ss)
+        for (i in seq (x)) {
+            ss [i] <- disperse_one_layer (net, fr_dat, ki [i], ksi [i],
+                                          p, dp) [4]
+        }
+        #ss <- foreach::foreach (i = seq (x)) %dopar%
+        #    disperse_one_layer (net, fr_dat, ki [i], ksi [i], p, dp) [4]
+        #ss <- unlist (ss)
     } else
     {
         if (to == "residential")
@@ -152,14 +155,14 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals, fitk = 
         dmat <- dodgr::dodgr_distances (net, from = fr_dat$id, to = to_dat$id)
         dmat [is.na (dmat)] <- max (dmat, na.rm = TRUE)
 
-        #for (i in seq (x)) {
-        #    ss [i] <- aggregate_one_layer (net, fr_dat, to_dat, ki [i],
-        #                                   ksi [i], p, dp, dmat)
-        #}
-        ss <- foreach::foreach (i = seq (x)) %dopar%
-            aggregate_one_layer (net, fr_dat, to_dat, ki [i],
-                                 ksi [i], p, dp, dmat)
-        ss <- unlist (ss)
+        for (i in seq (x)) {
+            ss [i] <- aggregate_one_layer (net, fr_dat, to_dat, ki [i],
+                                           ksi [i], p, dp, dmat)
+        }
+        #ss <- foreach::foreach (i = seq (x)) %dopar%
+        #    aggregate_one_layer (net, fr_dat, to_dat, ki [i],
+        #                         ksi [i], p, dp, dmat)
+        #ss <- unlist (ss)
     }
 
     mod <- stats::loess (ss ~ x, span = lspan)

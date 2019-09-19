@@ -1,5 +1,4 @@
 #' @keywords internal
-#' @importFrom foreach %dopar%
 "_PACKAGE"
 
 # The following block is used by usethis to automatically manage

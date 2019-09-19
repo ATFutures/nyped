@@ -14,13 +14,10 @@ LazyData: true
 Imports:
     cli,
     dodgr,
-    doParallel,
     dplyr,
-    foreach,
     magrittr,
     moveability,
     osmdata,
-    parallel,
     raster,
     rvest,
     sf,
