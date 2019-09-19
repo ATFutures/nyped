@@ -91,6 +91,7 @@ get_layer <- function (net, data_dir, from, to, k, k_scale, cache, quiet)
     {
         p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
         s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
+        dp <- dodgr::dodgr_dists (net, from = p$id)
 
         if (!quiet)
             message (cli::symbol$pointer, " Contracting street network",
@@ -100,7 +101,7 @@ get_layer <- function (net, data_dir, from, to, k, k_scale, cache, quiet)
         if (!quiet)
             message ("\r", cli::symbol$tick, " Contracted street network ")
 
-        res <- calc_layer (net, data_dir, from, to, k, k_scale, p, s,
+        res <- calc_layer (net, data_dir, from, to, k, k_scale, p, dp, s,
                            cache, quiet)
     }
 
@@ -126,27 +127,27 @@ is_layer_cached <- function (data_dir, from, to, k, k_scale)
     file.exists (get_file_name (data_dir, from, to, k, k_scale))
 }
 
-calc_layer <- function (net, data_dir, from, to, k, k_scale, p, s, cache, quiet)
+calc_layer <- function (net, data_dir, from, to, k, k_scale, p, dp, s, cache, quiet)
 {
     if (from == "residential")
-        res <- layer_subway_res (net, data_dir, p, s, k = k, k_scale = k_scale,
+        res <- layer_subway_res (net, data_dir, p, dp, s, k = k, k_scale = k_scale,
                                  reverse = TRUE, quiet = quiet)
     else if (to == "residential")
-        res <- layer_subway_res (net, data_dir, p, s, k = k, k_scale = k_scale,
+        res <- layer_subway_res (net, data_dir, p, dp, s, k = k, k_scale = k_scale,
                                  reverse = FALSE, quiet = quiet)
     else if (to == "disperse")
-        res <- layer_disperse (net, from = from, data_dir, p, s, k = k,
+        res <- layer_disperse (net, from = from, data_dir, p, dp, s, k = k,
                                k_scale = k_scale, quiet = quiet)
     else if (from == "subway")
     {
         if (to == "subway")
-            res <- layer_subway_subway (net, data_dir, p, s,
+            res <- layer_subway_subway (net, data_dir, p, dp, s,
                                         k = k, k_scale = k_scale, quiet = quiet)
         else
-            res <- layer_subway_attr (net, to = to, data_dir, p, s,
+            res <- layer_subway_attr (net, to = to, data_dir, p, dp, s,
                                       k = k, k_scale = k_scale, quiet = quiet)
     } else
-        res <- layer_attr_attr (net, from = from, to = to, data_dir, p, s,
+        res <- layer_attr_attr (net, from = from, to = to, data_dir, p, dp, s,
                                 k = k, k_scale = k_scale, quiet = quiet)
 
     if (cache)
@@ -179,7 +180,7 @@ format_time_int <- function (st0)
 # *****************   LAYER CALCULATION FUNCTIONS   ******************
 # ********************************************************************
 
-layer_subway_attr <- function (net, to = "disperse", data_dir, p, s,
+layer_subway_attr <- function (net, to = "disperse", data_dir, p, dp, s,
                                k = 700, k_scale = 0, quiet = FALSE)
 {
     if (!quiet)
@@ -231,7 +232,7 @@ layer_subway_attr <- function (net, to = "disperse", data_dir, p, s,
                  appendLF = FALSE)
     }
 
-    flows <- flow_to_ped_pts (net_f, p, get_nearest = TRUE)
+    flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
 
     if (!quiet)
         message ("\r", cli::symbol$tick,
@@ -241,7 +242,7 @@ layer_subway_attr <- function (net, to = "disperse", data_dir, p, s,
     return (p)
 }
 
-layer_subway_subway <- function (net, data_dir, p, s,
+layer_subway_subway <- function (net, data_dir, p, dp, s,
                                  k = 700, k_scale = 0, quiet = FALSE)
 {
     if (!quiet)
@@ -292,7 +293,7 @@ layer_subway_subway <- function (net, data_dir, p, s,
                  appendLF = FALSE)
     }
 
-    flows <- flow_to_ped_pts (net_f, p, get_nearest = TRUE)
+    flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
 
     if (!quiet)
         message ("\r", cli::symbol$tick,
@@ -303,7 +304,7 @@ layer_subway_subway <- function (net, data_dir, p, s,
 }
 
 layer_attr_attr <- function (net, from = "health", to = "disperse", data_dir,
-                             p, s, k = 700, k_scale = 0, quiet = FALSE)
+                             p, dp, s, k = 700, k_scale = 0, quiet = FALSE)
 {
     if (!quiet)
         message (cli::symbol$pointer, " Preparing spatial interaction matrices",
@@ -356,7 +357,7 @@ layer_attr_attr <- function (net, from = "health", to = "disperse", data_dir,
                  appendLF = FALSE)
     }
 
-    flows <- flow_to_ped_pts (net_f, p, get_nearest = TRUE)
+    flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
 
     if (!quiet)
         message ("\r", cli::symbol$tick,
@@ -366,7 +367,7 @@ layer_attr_attr <- function (net, from = "health", to = "disperse", data_dir,
     return (p)
 }
 
-layer_disperse <- function (net, from = "subway", data_dir, p, s,
+layer_disperse <- function (net, from = "subway", data_dir, p, dp, s,
                             k = 700, k_scale = 0, quiet = FALSE)
 {
     v <- dodgr::dodgr_vertices (net)
@@ -401,7 +402,7 @@ layer_disperse <- function (net, from = "subway", data_dir, p, s,
                  " Aligning flows to pedestrian count points", appendLF = FALSE)
     }
 
-    flows <- flow_to_ped_pts (net_f, p, get_nearest = TRUE)
+    flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
 
     if (!quiet)
         message ("\r", cli::symbol$tick,
@@ -415,7 +416,7 @@ layer_disperse <- function (net, from = "subway", data_dir, p, s,
 # weighted by subway counts and destinations by population density.
 # reverse calculates flows from residential areas to subways, with destinations
 # (subways) simply weighted equally and *NOT* by subway counts
-layer_subway_res <- function (net, data_dir, p, s, k = 700, k_scale = 0,
+layer_subway_res <- function (net, data_dir, p, dp, s, k = 700, k_scale = 0,
                               reverse = FALSE, quiet = FALSE)
 {
     k = k ^ (1 + k_scale * s$count2018 / max (s$count2018))
@@ -506,7 +507,7 @@ layer_subway_res <- function (net, data_dir, p, s, k = 700, k_scale = 0,
                  " Aligning flows to pedestrian count points", appendLF = FALSE)
     }
 
-    flows <- flow_to_ped_pts (net_f, p, get_nearest = TRUE)
+    flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
 
     if (!quiet)
         message ("\r", cli::symbol$tick,
@@ -559,13 +560,9 @@ d_subway_res <- function (net, s, nodes_new, data_dir)
 # *********************   MISC EXTRA FUNCTIONS   *********************
 # ********************************************************************
 
-flow_to_ped_pts <- function (net_f, p, get_nearest = TRUE)
+flow_to_ped_pts <- function (net_f, p, dp, get_nearest = TRUE)
 {
     flows <- rep (NA, nrow (p))
-
-    # Calculate dmat from all pedestrian count points - this takes very little
-    # time compared with the code below, so it's okay to repeat it each time
-    dp <- dodgr::dodgr_dists (net_f, from = p$id)
 
     for (i in seq (nrow (p)))
     {

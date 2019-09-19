@@ -6,6 +6,14 @@
 #' @export
 optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
 {
+
+    p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
+    s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
+    net <- dodgr::dodgr_contract_graph (net,
+                                        verts = unique (c (p$id, s$id)))
+    v <- dodgr::dodgr_vertices (net)
+    dp <- dodgr::dodgr_dists (net, from = p$id)
+
     txt <- paste0 ("Optimising model fit from ", from, " to ", to)
     message (cli::rule (center = txt, line = 2, col = "green"))
 
@@ -30,7 +38,8 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     message (cli::symbol$pointer, " Establishing initial model parameters",
                      appendLF = FALSE)
     st0 <- Sys.time ()
-    k <- stats::optimise (f_k, interval = c (200, 1500), from = from, to = to,
+    k <- stats::optimise (f_k, interval = c (200, 1500), k_scale = 0.0,
+                          from = from, to = to,
                           data_dir = data_dir, tol = 10)$minimum
     ks <- stats::optimise (f_ks, interval = c (-0.2, 0.3), k = k, from = from,
                            to = to, data_dir = data_dir, tol = 0.1)$minimum
@@ -68,10 +77,10 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
         ksold <- ks
 
         kvals <- k + (-5:5) * 10
-        k <- fit_one_ks (net, from, to, ks, k, data_dir, kvals, fitk = TRUE)
+        k <- fit_one_ks (net, from, to, p, dp, s, ks, k, data_dir, kvals, fitk = TRUE)
 
         ksvals <- ks + (-5:5) / 100
-        ks <- fit_one_ks (net, from, to, ks, k, data_dir, ksvals, fitk = FALSE)
+        ks <- fit_one_ks (net, from, to, p, dp, s, ks, k, data_dir, ksvals, fitk = FALSE)
 
         st <- formatC (as.numeric (difftime (Sys.time (), st1, units = "sec")),
                        format = "f", digits = 1)
@@ -101,7 +110,7 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     c ("k" = k, "k_scale" = ks)
 }
 
-fit_one_ks <- function (net, from, to, ks, k, data_dir, kvals, fitk = TRUE)
+fit_one_ks <- function (net, from, to, p, dp, s, ks, k, data_dir, kvals, fitk = TRUE)
 {
     lspan <- 0.75 # fixed span of loess fits
     if (fitk)
@@ -113,11 +122,45 @@ fit_one_ks <- function (net, from, to, ks, k, data_dir, kvals, fitk = TRUE)
         ksi <- x <- kvals
         ki <- rep (k, length (ksi))
     }
+
+    v <- dodgr::dodgr_vertices (net)
+
+    # get fr_dat with columns of (id, n), where id is matched to v$id
+    if (from == "residential")
+    {
+        net <- reverse_net (net)
+        fr_dat <- get_res_dat (v, data_dir)
+    } else if (from == "subway")
+        fr_dat <- get_subway_dat (s)
+    else
+        fr_dat <- get_attractor_layer (data_dir, v, type = from)
+
     ss <- rep (NA, length (x))
-    for (i in seq (x)) {
-        ss [i] <- fit_one_layer (net, from = from, to = to,
-                                 k = ki [i], k_scale = ksi [i],
-                                 data_dir, quiet = TRUE) [4]
+    if (to == "disperse")
+    {
+        for (i in seq (x)) {
+            ss [i] <- disperse_one_layer (net, fr_dat, ki [i], ksi [i],
+                                          p, dp) [4]
+    }
+    } else
+    {
+        if (to == "residential")
+            to_dat <- get_res_dat (v, data_dir)
+        else if (to == "subway")
+            to_dat <- get_subway_dat (s)
+        else
+            to_dat <- get_attractor_layer (data_dir, v, type = to)
+
+        nfr <- nrow (fr_dat)
+        nto <- nrow (to_dat)
+
+        dmat <- dodgr::dodgr_distances (net, from = fr_dat$id, to = to_dat$id)
+        dmat [is.na (dmat)] <- max (dmat, na.rm = TRUE)
+
+        for (i in seq (x)) {
+            ss [i] <- aggregate_one_layer (net, fr_dat, to_dat, ki [i],
+                                           ksi [i], p, dp, dmat)
+        }
     }
 
     # attempt at parallel, which fails:
@@ -128,6 +171,7 @@ fit_one_ks <- function (net, from, to, ks, k, data_dir, kvals, fitk = TRUE)
     #                               fit_one_layer (net, from, to, i [1], i [2],
     #                                              data_dir, quiet = TRUE) [4]
     #        })
+
     mod <- stats::loess (ss ~ x, span = lspan)
     sdlim <- 2 * stats::sd (mod$residuals)
     n <- length (which (abs (mod$residuals) > sdlim))
@@ -149,4 +193,91 @@ fit_one_ks <- function (net, from, to, ks, k, data_dir, kvals, fitk = TRUE)
         res <- x [which.min (mod$fitted)]
     }
     return (res)
+}
+
+reverse_net <- function (net)
+{
+    vx0 <- net$.vx0
+    net$.vx0 <- net$.vx1
+    net$.vx1 <- vx0
+
+    vx0_x <- net$.vx0_x
+    net$.vx0_x <- net$.vx1_x
+    net$.vx1_x <- vx0_x
+
+    vx0_y <- net$.vx0_y
+    net$.vx0_y <- net$.vx1_y
+    net$.vx1_y <- vx0_y
+
+    vx1_x <- net$.vx1_x
+    net$.vx1_x <- net$.vx1_x
+    net$.vx1_x <- vx1_x
+
+    vx1_y <- net$.vx1_y
+    net$.vx1_y <- net$.vx1_y
+    net$.vx1_y <- vx1_y
+
+    return (net)
+}
+
+get_res_dat <- function (v, data_dir)
+{
+    nodes_new <- get_popdens_data (v, data_dir)
+    data.frame (id = nodes_new$id,
+                n = nodes_new [[grep ("ppp", names (nodes_new))]],
+                stringsAsFactors = FALSE)
+}
+
+get_subway_dat <- function (s)
+{
+    data.frame (id = s$id,
+                n = s$count2018,
+                stringsAsFactors = FALSE)
+}
+
+disperse_one_layer <- function (net, fr_dat, k, ks, p, dp)
+{
+    kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
+    net_f <- dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
+                                          dens = fr_dat$n, k = kvals)
+    flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
+    p$flows <- flows
+
+    mod <- summary (stats::lm (p$week ~ p$flows))
+    c (k = k,
+       k_scale = ks,
+       r2 = mod$adj.r.squared,
+       ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6)
+}
+
+aggregate_one_layer <- function (net, fr_dat, to_dat, k, ks, p, dp, dmat)
+{
+    nfr <- nrow (fr_dat)
+    nto <- nrow (to_dat)
+
+    kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
+    kmat <- matrix (kvals, nrow = nfr, ncol = nto)
+
+    frmat <- matrix (fr_dat$n, nrow = nfr, ncol = nto)
+    tomat <- t (matrix (to_dat$n, nrow = nto, ncol = nfr))
+
+    emat <- frmat * exp (-dmat / kmat)
+    # the first constraint, to unit sums over all destinations (columns)
+    # from each origin (row)
+    cmat <- t (matrix (colSums (emat), nrow = nto, ncol = nfr))
+    emat <- emat / cmat
+    # the second constraint, so each origin (row) allocates fr$n to all
+    # destinations (columns)
+    fmat <- frmat * emat / nto
+
+    net_f <- dodgr::dodgr_flows_aggregate (net, from = fr_dat$id,
+                                           to = to_dat$id, flows = fmat)
+    flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
+    p$flows <- flows
+
+    mod <- summary (stats::lm (p$week ~ p$flows))
+    c (k = k,
+       k_scale = ks,
+       r2 = mod$adj.r.squared,
+       ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6)
 }
