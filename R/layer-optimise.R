@@ -53,18 +53,10 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     # The main optimisation loop, which does not use optimise because the
     # functions are actually very noisy.
 
-    #nc <- parallel::detectCores () - 1
-    #cl <- parallel::makeCluster (nc)
-    #parallel::clusterExport (cl, c ("net", "from", "to", "data_dir",
-    #                                "fit_one_layer", "ny_layer", "ped_osm_id",
-    #                                "get_layer", "subway_osm_id",
-    #                                "get_file_name", "calc_layer",
-    #                                "nyped_data", "nysubway_data",
-    #                                "layer_disperse", "layer_subway_attr",
-    #                                "layer_subway_subway", "layer_attr_attr",
-    #                                "layer_subway_res", "d_subway_res",
-    #                                "flow_to_ped_pts", "get_attractor_layer"))
-    ##                         envir = environment ())
+    nc <- parallel::detectCores () - 1
+    #nc <- floor (parallel::detectCores () / 2)
+    cl <- parallel::makeCluster (nc)
+    doParallel::registerDoParallel (nc)
 
     kold <- ksold <- 1e12
     st1 <- Sys.time ()
@@ -77,10 +69,10 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
         ksold <- ks
 
         kvals <- k + (-5:5) * 10
-        k <- fit_one_ks (net, from, to, p, dp, s, ks, k, data_dir, kvals, fitk = TRUE)
+        k <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals, fitk = TRUE)
 
         ksvals <- ks + (-5:5) / 100
-        ks <- fit_one_ks (net, from, to, p, dp, s, ks, k, data_dir, ksvals, fitk = FALSE)
+        ks <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, ksvals, fitk = FALSE)
 
         st <- formatC (as.numeric (difftime (Sys.time (), st1, units = "sec")),
                        format = "f", digits = 1)
@@ -93,8 +85,8 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
         if (niters > 10)
             break
     }
-    #message ("\r", cli::symbol$tick, "Optimised fit; Iteration [",
-    #         niters, " in ", st, "s  ")
+    message ("\r", cli::symbol$tick, "Optimised fit; Iteration [",
+             niters, " in ", st, "s  ")
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
     message ()
@@ -105,12 +97,12 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     message (cli::rule (center = paste0 (txt, niters, " iterations and ", st,
                                          "s: (k, ks) = (", k, ", ", ks, ")"),
                         line = 2, col = "green"))
-    #parallel::stopCluster (cl)
+    parallel::stopCluster (cl)
 
     c ("k" = k, "k_scale" = ks)
 }
 
-fit_one_ks <- function (net, from, to, p, dp, s, ks, k, data_dir, kvals, fitk = TRUE)
+fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals, fitk = TRUE)
 {
     lspan <- 0.75 # fixed span of loess fits
     if (fitk)
@@ -136,12 +128,15 @@ fit_one_ks <- function (net, from, to, p, dp, s, ks, k, data_dir, kvals, fitk = 
         fr_dat <- get_attractor_layer (data_dir, v, type = from)
 
     ss <- rep (NA, length (x))
+    i <- NULL # suppress no visible binding note
     if (to == "disperse")
     {
-        for (i in seq (x)) {
-            ss [i] <- disperse_one_layer (net, fr_dat, ki [i], ksi [i],
-                                          p, dp) [4]
-    }
+        #for (i in seq (x)) {
+        #    ss [i] <- disperse_one_layer (net, fr_dat, ki [i], ksi [i],
+        #                                  p, dp) [4]
+        ss <- foreach::foreach (i = seq (x)) %dopar%
+            disperse_one_layer (net, fr_dat, ki [i], ksi [i], p, dp) [4]
+        ss <- unlist (ss)
     } else
     {
         if (to == "residential")
@@ -157,20 +152,15 @@ fit_one_ks <- function (net, from, to, p, dp, s, ks, k, data_dir, kvals, fitk = 
         dmat <- dodgr::dodgr_distances (net, from = fr_dat$id, to = to_dat$id)
         dmat [is.na (dmat)] <- max (dmat, na.rm = TRUE)
 
-        for (i in seq (x)) {
-            ss [i] <- aggregate_one_layer (net, fr_dat, to_dat, ki [i],
-                                           ksi [i], p, dp, dmat)
-        }
+        #for (i in seq (x)) {
+        #    ss [i] <- aggregate_one_layer (net, fr_dat, to_dat, ki [i],
+        #                                   ksi [i], p, dp, dmat)
+        #}
+        ss <- foreach::foreach (i = seq (x)) %dopar%
+            aggregate_one_layer (net, fr_dat, to_dat, ki [i],
+                                 ksi [i], p, dp, dmat)
+        ss <- unlist (ss)
     }
-
-    # attempt at parallel, which fails:
-    #kvals <- data.frame (k = ki, ks = ksi)
-    ## convert to list of rows:
-    #kvals <- as.list (as.data.frame (t (kvals)))
-    #ss <- parallel::parLapply (cl, kvals, function (i) {
-    #                               fit_one_layer (net, from, to, i [1], i [2],
-    #                                              data_dir, quiet = TRUE) [4]
-    #        })
 
     mod <- stats::loess (ss ~ x, span = lspan)
     sdlim <- 2 * stats::sd (mod$residuals)
@@ -222,7 +212,15 @@ reverse_net <- function (net)
 
 get_res_dat <- function (v, data_dir)
 {
-    nodes_new <- get_popdens_data (v, data_dir)
+    # pop values go up to around 3,000, so ones below this value are removed
+    dens_limit <- 0.01
+
+    nodes_new <- readRDS (file.path (data_dir, "worldpop", "pop-points.Rds"))
+    layer_name <- names (nodes_new) [grep ("ppp_", names (nodes_new))]
+    nodes_new$id <- v$id [dodgr::match_points_to_graph (v, nodes_new)]
+    index <- which (!(nodes_new [[layer_name]] < dens_limit |
+                      is.na (nodes_new [[layer_name]])))
+    nodes_new <- nodes_new [index, ]
     data.frame (id = nodes_new$id,
                 n = nodes_new [[grep ("ppp", names (nodes_new))]],
                 stringsAsFactors = FALSE)
