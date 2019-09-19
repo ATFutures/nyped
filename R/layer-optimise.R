@@ -45,10 +45,11 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
                            to = to, data_dir = data_dir, tol = 0.1)$minimum
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
-    message ("\r", cli::symbol$tick,
-             " Established initial model parameters in ", st, "s")
     k <- 10 * round (k / 10)
     ks <- round (ks * 100) / 100 # round(.,digits = 2) keeps all decimals
+    message ("\r", cli::symbol$tick,
+             " Established initial model parameters in ", st,
+             "s: (k, ks) = (", k, ", ", ks, ")")
 
     # The main optimisation loop, which does not use optimise because the
     # functions are actually very noisy.
@@ -88,7 +89,7 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
             break
     }
     message ("\r", cli::symbol$tick, "Optimised fit; Iteration [",
-             niters, " in ", st, "s  ")
+             niters, " in ", st, "s: (k, ks) = (", k, ", ", ks, ")")
     st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
                    format = "f", digits = 1)
     message ()
@@ -157,7 +158,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals, fitk = 
 
         for (i in seq (x)) {
             ss [i] <- aggregate_one_layer (net, fr_dat, to_dat, ki [i],
-                                           ksi [i], p, dp, dmat)
+                                           ksi [i], p, dp, dmat) [4]
         }
         #ss <- foreach::foreach (i = seq (x)) %dopar%
         #    aggregate_one_layer (net, fr_dat, to_dat, ki [i],
