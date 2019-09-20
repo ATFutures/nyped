@@ -257,7 +257,7 @@ disperse_one_layer <- function (net, fr_dat, k, ks, p, dp)
         # dispersal sometimes errors in parallel aggregation
         net_f <- tryCatch ({
             dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
-                                         dens = fr_Dat$n, k = kvals) },
+                                         dens = fr_dat$n, k = kvals) },
             error = function (e) { NULL },
             warning = function (w) { NULL })
     }
