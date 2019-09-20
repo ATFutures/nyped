@@ -105,7 +105,8 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     c ("k" = k, "k_scale" = ks)
 }
 
-fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals, fitk = TRUE)
+fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
+                        fitk = TRUE, plot = FALSE)
 {
     lspan <- 0.75 # fixed span of loess fits
     if (fitk)
@@ -167,6 +168,11 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals, fitk = 
     }
 
     mod <- stats::loess (ss ~ x, span = lspan)
+    if (plot)
+    {
+        plot (x, ss, pch = 2, col ="orange")
+        lines (x, mod$fitted, col = "red", lwd = 2)
+    }
     sdlim <- 2 * stats::sd (mod$residuals)
     n <- length (which (abs (mod$residuals) > sdlim))
     if (n > 0 & n < 3) # remove extreme values
@@ -181,11 +187,16 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals, fitk = 
         if (!is.null (mod2))
             mod <- mod2
         fit <- stats::predict (mod, newdata = data.frame (x2 = x))
+        if (plot)
+            lines (x, fit, col = "red", lwd = 2, lty = 2)
         res <- x [which.min (fit)]
     } else
     {
         res <- x [which.min (mod$fitted)]
     }
+    if (plot)
+        points (res, ss [res], pch = 19, col = "red", cex = 2)
+
     return (res)
 }
 
@@ -240,16 +251,27 @@ get_subway_dat <- function (s)
 disperse_one_layer <- function (net, fr_dat, k, ks, p, dp)
 {
     kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
-    net_f <- dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
-                                          dens = fr_dat$n, k = kvals)
+    net_f <- NULL
+    while (is.null (net_f))
+    {
+        # dispersal sometimes errors in parallel aggregation
+        net_f <- tryCatch ({
+            dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
+                                         dens = fr_Dat$n, k = kvals) },
+            error = function (e) { NULL },
+            warning = function (w) { NULL })
+    }
+    #net_f <- dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
+    #                                      dens = fr_dat$n, k = kvals)
     flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
     p$flows <- flows
 
     mod <- summary (stats::lm (p$week ~ p$flows))
-    c (k = k,
-       k_scale = ks,
-       r2 = mod$adj.r.squared,
-       ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6)
+    list (stats = c (k = k,
+                     k_scale = ks,
+                     r2 = mod$adj.r.squared,
+                     ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6),
+          p = p)
 }
 
 aggregate_one_layer <- function (net, fr_dat, to_dat, k, ks, p, dp, dmat)
@@ -272,14 +294,25 @@ aggregate_one_layer <- function (net, fr_dat, to_dat, k, ks, p, dp, dmat)
     # destinations (columns)
     fmat <- frmat * emat / nto
 
-    net_f <- dodgr::dodgr_flows_aggregate (net, from = fr_dat$id,
-                                           to = to_dat$id, flows = fmat)
+    net_f <- NULL
+    while (is.null (net_f))
+    {
+        # aggregation sometimes errors in parallel aggregation
+        net_f <- tryCatch ({
+            dodgr::dodgr_flows_aggregate (net, from = fr_dat$id,
+                                          to = to_dat$id, flows = fmat) },
+            error = function (e) { NULL },
+            warning = function (w) { NULL })
+    }
+    #net_f <- dodgr::dodgr_flows_aggregate (net, from = fr_dat$id,
+    #                                       to = to_dat$id, flows = fmat)
     flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
     p$flows <- flows
 
     mod <- summary (stats::lm (p$week ~ p$flows))
-    c (k = k,
-       k_scale = ks,
-       r2 = mod$adj.r.squared,
-       ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6)
+    list (stats = c (k = k,
+                     k_scale = ks,
+                     r2 = mod$adj.r.squared,
+                     ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6),
+          p = p)
 }
