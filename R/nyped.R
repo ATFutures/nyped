@@ -39,9 +39,9 @@ nyped_data <- function (data_dir = tempdir (), quiet = FALSE)
     # average measures over the various count days, obtaining single estimates
     # of pedestrian volumes within a 3-hour window
     index <- grep ("\\_AM|\\_PM", names (xdat))
-    weekday <- rowSums (xdat [, index]) / length (index)
+    weekday <- round (rowSums (xdat [, index]) / length (index))
     index <- grep ("\\_MD", names (xdat))
-    weekend <- rowSums (xdat [, index]) / length (index)
+    weekend <- round (rowSums (xdat [, index]) / length (index))
 
     if (!quiet)
         message ("\r", cli::symbol$tick, " Loaded pedestrian data  ")
