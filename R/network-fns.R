@@ -72,11 +72,11 @@ subway_osm_id <- function (data_dir, net = NULL, quiet = FALSE)
             net <- get_ny_network (data_dir)
 
         s <- nysubway_data (quiet = quiet)
-        s$count2018 <- s$count2018 / 365 # convert to daily counts
+        s$count2018 <- round (s$count2018 / 365) # convert to daily counts
         sxy <- sf::st_coordinates (s$geom)
         v <- dodgr::dodgr_vertices (net)
         s$id <- v$id [dodgr::match_points_to_graph (v, sxy)]
-        s [which (s$id %in% v$id), ]
+        s <- s [which (s$id %in% v$id), ]
 
         saveRDS (s, file = f)
     }
