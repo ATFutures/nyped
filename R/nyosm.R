@@ -9,9 +9,9 @@
 #' @export
 nyosm_data <- function (data_dir)
 {
-    ny_osm_hw (data_dir)
-    ny_green (data_dir)
-    ny_attractors (data_dir)
+    list (osm = ny_osm_hw (data_dir),
+          green = ny_green (data_dir),
+          attr = ny_attractors (data_dir))
 }
 
 ny_osm_hw <- function (data_dir)
@@ -24,11 +24,12 @@ ny_osm_hw <- function (data_dir)
         bb <- osmdata::getbb ("new york city", format_out = "polygon")
         q <- osmdata::opq (bb) %>%
             osmdata::add_osm_feature (key = "highway")
-        hw <- osmdata::osmdata_xml (q, filename = file.path (data_dir, "ny.osm"),
-                                    quiet = FALSE)
-        hw <- osmdata::osmdata_sc (q, doc = "ny.osm")
+        doc <- file.path (data_dir, "osm", "ny.osm")
+        hw <- osmdata::osmdata_xml (q, filename = doc, quiet = FALSE)
+        hw <- osmdata::osmdata_sc (q, doc = doc)
         hw <- osmdata::trim_osmdata (hw, bb)
         saveRDS (hw, f)
+        file.remove (doc)
         message ("\r", cli::symbol$tick, " Downloaded openstreetmap data  ")
     } else
     {
