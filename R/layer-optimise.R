@@ -23,12 +23,13 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     ks <- 0.0
     kvals <- 1:15 * 200
     if (to == "disperse")
-        ss <- fit_one_k_disperse (net, from, to, p, dp, s, data_dir, kvals)
+        ss <- fit_one_k_disperse (net, from, p, dp, s, data_dir, kvals)
     else
         ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals,
                           fitk = TRUE)
     k <- k_old <- ss$kmin
-    message (cli::col_green (cli::symbol$star), " Initial k value = ", k)
+    message (cli::col_green (cli::symbol$star), " Initial k value = ", k,
+             " (lambda = ", ss$lambdamin, ")")
 
     if (to != "disperse")
     {
@@ -39,9 +40,10 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
                           fitk = FALSE)
         ks <- ks_old <- ss$kmin # -0.2
         message (cli::col_green (cli::symbol$star), " Initial ks value = ", ks)
-    }
+    } else
+        ks_old <- ks
 
-    # second, slightly finer k-values
+    # second, slightly finer k-values truncated at overserved minimum
     if (ks > 0)
     {
         kvals <- 1:30 * 100
@@ -49,10 +51,11 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     } else
         kvals <- k + -2:8 * 100
     message (cli::col_cyan (cli::symbol$star), " Second k values [",
-             min (kvals), " -> ", max (kvals), "]")
+             min (kvals), " -> ", max (kvals), "] (lambda = ",
+             ss$lambdamin, ")")
     kvals <- kvals [kvals > 0]
     if (to == "disperse")
-        ss <- fit_one_k_disperse (net, from, to, p, dp, s, data_dir, kvals)
+        ss <- fit_one_k_disperse (net, from, p, dp, s, data_dir, kvals)
     else
         ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals,
                           fitk = TRUE)
@@ -84,7 +87,7 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     message (cli::col_cyan (cli::symbol$star), " Third k values [",
              min (kvals), " -> ", max (kvals), "]")
     if (to == "disperse")
-        ss <- fit_one_k_disperse (net, from, to, p, dp, s, data_dir, kvals)
+        ss <- fit_one_k_disperse (net, from, p, dp, s, data_dir, kvals)
     else
         ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals,
                           fitk = TRUE)
@@ -106,7 +109,7 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
         message (cli::col_cyan (cli::symbol$star), " Loop (", niters,
                  ") k values [", min (kvals), " -> ", max (kvals), "]")
         if (to == "disperse")
-            ss <- fit_one_k_disperse (net, from, to, p, dp, s, data_dir, kvals)
+            ss <- fit_one_k_disperse (net, from, p, dp, s, data_dir, kvals)
         else
             ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir,
                               kvals, fitk = TRUE)
@@ -124,8 +127,7 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
                      LETTERS [niters2], ") k values [", min (kvals), " -> ",
                      max (kvals), "]")
             if (to == "disperse")
-                ss <- fit_one_k_disperse (net, from, to, p, dp, s, data_dir,
-                                          kvals)
+                ss <- fit_one_k_disperse (net, from, p, dp, s, data_dir, kvals)
             else
                 ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir,
                                   kvals, fitk = TRUE)
@@ -137,7 +139,7 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
                 break
         }
         if (sd (ss$ss, na.rm = TRUE) > 0.1)
-            k <- ss$kmin # 200
+            k <- ss$kmin
 
         if (to != "disperse")
         {
@@ -161,7 +163,7 @@ optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
     c (k = k, ks = ks)
 }
 
-fit_one_k_disperse <- function (net, from, to, p, dp, s, data_dir, kvals,
+fit_one_k_disperse <- function (net, from, p, dp, s, data_dir, kvals,
                                 plot = FALSE)
 {
     lspan <- 0.75 # fixed span of loess fits
@@ -178,20 +180,22 @@ fit_one_k_disperse <- function (net, from, to, p, dp, s, data_dir, kvals,
     else
         fr_dat <- get_attractor_layer (data_dir, v, type = from)
 
-    ss <- rep (NA, length (kvals))
+    ss <- lambda <- rep (NA, length (kvals))
     i <- NULL # suppress no visible binding note
     pb <- txtProgressBar (style = 3)
     for (i in seq (kvals)) {
         temp <- disperse_one_layer (net, fr_dat, kvals [i], p, dp)
         ss [i] <- temp$stats [4]
-        setTxtProgressBar (pb, i / length (x))
+        lambda [i] <- temp$stats [2]
+        setTxtProgressBar (pb, i / length (kvals))
         if (i > 2 & all (diff (ss [!is.na (ss)]) > 0))
             break # lowest SS is first k
     }
     close (pb)
 
     if (any (is.na (ss))) # if SS progressively increases with first k-values
-        return (list (k = kvals, ss = ss, kmin = kvals [1]))
+        return (list (k = kvals, ss = ss, lambda = lambda, kmin = kvals [1],
+                      lambdamin = lambda [1]))
 
     mod <- stats::loess (ss ~ kvals, span = lspan)
     kvals2 <- NULL # no visible binding message
@@ -218,10 +222,12 @@ fit_one_k_disperse <- function (net, from, to, p, dp, s, data_dir, kvals,
             lines (kvals, fit, col = "red", lwd = 2, lty = 2)
     }
     res <- kvals [which.min (fit)]
+    lambda0 <- lambda [which.min (fit)]
     if (plot)
         points (res, ss [res], pch = 19, col = "red", cex = 2)
 
-    return (list (k = kvals, ss = ss, kmin = res))
+    return (list (k = kvals, ss = ss, lambda = lambda, kmin = res,
+                  lambdamin = lambda0))
 }
 
 fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
@@ -250,7 +256,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
     else
         fr_dat <- get_attractor_layer (data_dir, v, type = from)
 
-    ss <- rep (NA, length (x))
+    ss <- lambda <- rep (NA, length (x))
     i <- NULL # suppress no visible binding note
     pb <- txtProgressBar (style = 3)
     if (to == "residential")
@@ -267,6 +273,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
         temp <- aggregate_one_layer (net, fr_dat, to_dat, ki [i],
                                      ksi [i], p, dp, dmat)
         ss [i] <- temp$stats [4]
+        lambda [i] <- temp$stats [2]
         setTxtProgressBar (pb, i / length (x))
         if (i > 2 & all (diff (ss [!is.na (ss)]) > 0))
             break # lowest SS is first k
@@ -274,7 +281,8 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
     close (pb)
 
     if (any (is.na (ss))) # if SS progressively increases with first k-values
-        return (list (k = x, ss = ss, kmin = x [1]))
+        return (list (k = x, ss = ss, lambda = lambda, kmin = x [1],
+                      lambdamin = lambda [1]))
 
     mod <- stats::loess (ss ~ x, span = lspan)
     x2 <- NULL # no visible binding message
@@ -301,10 +309,12 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
             lines (x, fit, col = "red", lwd = 2, lty = 2)
     }
     res <- x [which.min (fit)]
+    lambda0 <- lambda [which.min (fit)]
     if (plot)
         points (res, ss [res], pch = 19, col = "red", cex = 2)
 
-    return (list (k = x, ss = ss, kmin = res))
+    return (list (k = x, ss = ss, lambda = lambda, kmin = res,
+                  lambdamin = lambdamin))
 }
 
 reverse_net <- function (net)
@@ -362,9 +372,15 @@ disperse_one_layer <- function (net, fr_dat, k, p, dp)
     flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
     p$flows <- flows
 
-    mod <- summary (stats::lm (p$week ~ p$flows))
+    lambda <- seq (0, 1, length.out = 101)
+    r2 <- vapply (lambda, function (i)
+                  summary (stats::lm (p$week ~ p$flows,
+                                      weights = p$week ^ i))$r.squared,
+                  numeric (1))
+    lambda <- lambda [which.max (r2)]
+    mod <- summary (stats::lm (p$week ~ p$flows, weights = p$week ^ lambda))
     list (stats = c (k = k,
-                     k_scale = NA,
+                     lambda = lambda,
                      r2 = mod$adj.r.squared,
                      ss = sum (mod$residuals ^ 2) /
                          length (mod$residuals) / 1e6),
@@ -405,9 +421,16 @@ aggregate_one_layer <- function (net, fr_dat, to_dat, k, ks, p, dp, dmat)
     flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
     p$flows <- flows
 
-    mod <- summary (stats::lm (p$week ~ p$flows))
+    lambda <- seq (0, 1, length.out = 101)
+    r2 <- vapply (lambda, function (i)
+                  summary (stats::lm (p$week ~ p$flows,
+                                      weight = p$week ^ i))$r.squared,
+                  numeric (1))
+    lambda <- lambda [which.max (r2)]
+    mod <- summary (stats::lm (p$week ~ p$flows, weight = p$week ^ lambda))
     list (stats = c (k = k,
                      k_scale = ks,
+                     lambda = lambda,
                      r2 = mod$adj.r.squared,
                      ss = sum (mod$residuals ^ 2) /
                          length (mod$residuals) / 1e6),
