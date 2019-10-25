@@ -1,108 +1,227 @@
 #' optimise_layer
 #'
 #' Optimise `k` and `k_scale` parameters to optimally fit flow layer to observed
-#' pedestrian densities
+#' pedestrian densities. Note that optimisation can't be implemented directly
+#' because results are too noisy, so a series of custom ranges is scanned, and
+#' optimal values found from loess fits.
+#'
 #' @inheritParams ny_layer
 #' @export
 optimise_layer <- function (net, from = "subway", to = "disperse", data_dir)
 {
-
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
-    net <- dodgr::dodgr_contract_graph (net,
-                                        verts = unique (c (p$id, s$id)))
-    v <- dodgr::dodgr_vertices (net)
+    net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
     dp <- dodgr::dodgr_dists (net, from = p$id)
 
     txt <- paste0 ("Optimising model fit from ", from, " to ", to)
     message (cli::rule (center = txt, line = 2, col = "green"))
 
-    f_k <- function (k = 700, k_scale = 0.0, from = from, to = to,
-                     data_dir = data_dir)
+    # initial k values 100:3000
+    message (cli::col_cyan (cli::symbol$star),
+             " Initial k values [100 -> 3000]")
+    ks <- 0.0
+    kvals <- 1:15 * 200
+    if (to == "disperse")
+        ss <- fit_one_k_disperse (net, from, to, p, dp, s, data_dir, kvals)
+    else
+        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals,
+                          fitk = TRUE)
+    k <- k_old <- ss$kmin
+    message (cli::col_green (cli::symbol$star), " Initial k value = ", k)
+
+    if (to != "disperse")
     {
-        res <- fit_one_layer (net, from = from, to = to, k = k,
-                              k_scale = k_scale, data_dir = data_dir,
-                              quiet = TRUE)
-        res [which (names (res) == "ss")]
+        # initial ks values -1:2
+        message (cli::col_cyan (cli::symbol$star), " Initial ks values [-1 -> 2]")
+        ksvals <- (-5:10) / 5
+        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, ksvals,
+                          fitk = FALSE)
+        ks <- ks_old <- ss$kmin # -0.2
+        message (cli::col_green (cli::symbol$star), " Initial ks value = ", ks)
     }
-    f_ks <- function (k_scale = 0, k = 700, from = from, to = to,
-                      data_dir = data_dir)
+
+    # second, slightly finer k-values
+    if (ks > 0)
     {
-        res <- fit_one_layer (net, from = from, to = to, k = k,
-                              k_scale = k_scale, data_dir = data_dir,
-                              quiet = TRUE)
-        res [which (names (res) == "ss")]
+        kvals <- 1:30 * 100
+        kvals <- kvals [kvals <= k]
+    } else
+        kvals <- k + -2:8 * 100
+    message (cli::col_cyan (cli::symbol$star), " Second k values [",
+             min (kvals), " -> ", max (kvals), "]")
+    kvals <- kvals [kvals > 0]
+    if (to == "disperse")
+        ss <- fit_one_k_disperse (net, from, to, p, dp, s, data_dir, kvals)
+    else
+        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals,
+                          fitk = TRUE)
+    k_old <- k
+    k <- ss$kmin
+    message (cli::col_green (cli::symbol$star), " Second k value = ", k)
+
+    if (to != "disperse")
+    {
+        # second ks-values
+        ksvals <- ks + (-5:5) / 10
+        message (cli::col_cyan (cli::symbol$star), " Second ks values [",
+                 min (ksvals), " -> ", max (ksvals), "]")
+        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, ksvals,
+                          fitk = FALSE)
+        ks_old <- ks
+        ks <- ss$kmin # -0.2
+        message (cli::col_green (cli::symbol$star), " Second ks value = ", ks)
     }
 
-    # Use optimise to establish initial values
-    message (cli::symbol$pointer, " Establishing initial model parameters",
-                     appendLF = FALSE)
-    st0 <- Sys.time ()
-    k <- stats::optimise (f_k, interval = c (200, 1500), k_scale = 0.0,
-                          from = from, to = to,
-                          data_dir = data_dir, tol = 10)$minimum
-    ks <- stats::optimise (f_ks, interval = c (-0.2, 0.3), k = k, from = from,
-                           to = to, data_dir = data_dir, tol = 0.1)$minimum
-    st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
-                   format = "f", digits = 1)
-    k <- 10 * round (k / 10)
-    ks <- round (ks * 100) / 100 # round(.,digits = 2) keeps all decimals
-    message ("\r", cli::symbol$tick,
-             " Established initial model parameters in ", st,
-             "s: (k, ks) = (", k, ", ", ks, ")")
+    # 3rd round of k-values
+    if (ks > 0)
+    {
+        kvals <- 1:30 * 100
+        kvals <- kvals [kvals <= k]
+    } else
+        kvals <- k + -2:8 * 100
+    kvals <- kvals [kvals > 0]
+    message (cli::col_cyan (cli::symbol$star), " Third k values [",
+             min (kvals), " -> ", max (kvals), "]")
+    if (to == "disperse")
+        ss <- fit_one_k_disperse (net, from, to, p, dp, s, data_dir, kvals)
+    else
+        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals,
+                          fitk = TRUE)
+    k_old <- k
+    k <- ss$kmin
+    message (cli::col_green (cli::symbol$star), " Third k value = ", k)
 
-    # The main optimisation loop, which does not use optimise because the
-    # functions are actually very noisy.
+    #if (ks == ks_old) k_old <- k
 
-    # parallel here appears to muck with the RcppParalllel operation of dodgr
-    # used for flow aggregation, so can't be (reliably) used.
-    #nc <- parallel::detectCores () - 1
-    #nc <- floor (parallel::detectCores () / 2)
-    #cl <- parallel::makeCluster (nc)
-    #doParallel::registerDoParallel (nc)
-
-    kold <- ksold <- 1e12
-    st1 <- Sys.time ()
+    # Then loop over both until convergence
     niters <- 1
-    message (cli::symbol$pointer, " Optimising fit ", appendLF = FALSE)
-    opt <- FALSE
-    while (!(k == kold & ks == ksold))
+    while (abs (k - k_old) > 0 & abs (ks - ks_old) > 0)
     {
-        kold <- k
-        ksold <- ks
+        k_old <- k
+        ks_old <- ks
 
         kvals <- k + (-5:5) * 10
-        k <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals, fitk = TRUE)
+        kvals <- kvals [kvals > 0]
+        message (cli::col_cyan (cli::symbol$star), " Loop (", niters,
+                 ") k values [", min (kvals), " -> ", max (kvals), "]")
+        if (to == "disperse")
+            ss <- fit_one_k_disperse (net, from, to, p, dp, s, data_dir, kvals)
+        else
+            ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir,
+                              kvals, fitk = TRUE)
+        if (sd (ss$ss, na.rm = TRUE) > 0.1)
+            k <- ss$kmin
+        message (cli::col_green (cli::symbol$star), " Loop (", niters,
+                 ") k = ", k)
 
-        ksvals <- ks + (-5:5) / 100
-        ks <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, ksvals, fitk = FALSE)
+        niters2 <- 1
+        while (k == min (ss$k))
+        {
+            kvals <- kvals - 100
+            kvals <- kvals [kvals > 0]
+            message (cli::col_cyan (cli::symbol$star), " Loop (", niters,
+                     LETTERS [niters2], ") k values [", min (kvals), " -> ",
+                     max (kvals), "]")
+            if (to == "disperse")
+                ss <- fit_one_k_disperse (net, from, to, p, dp, s, data_dir,
+                                          kvals)
+            else
+                ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir,
+                                  kvals, fitk = TRUE)
+            k <- ss$kmin
+            message (cli::col_green (cli::symbol$star), " Loop (", niters,
+                     LETTERS [niters2], ") k = ", k)
+            niters2 <- niters2 + 1
+            if (niters2 > 10)
+                break
+        }
+        if (sd (ss$ss, na.rm = TRUE) > 0.1)
+            k <- ss$kmin # 200
 
-        st <- formatC (as.numeric (difftime (Sys.time (), st1, units = "sec")),
-                       format = "f", digits = 1)
-        message ("\r", cli::symbol$pointer, " Optimising fit; Iteration [",
-                 niters, " in ", st, "s]", appendLF = FALSE)
+        if (to != "disperse")
+        {
+            ksvals <- ks + (-5:5) / 10
+            message (cli::col_cyan (cli::symbol$star), " Loop (", niters,
+                     ") ks values [", min (ksvals), " -> ", max (ksvals), "]")
+            ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir,
+                              ksvals, fitk = FALSE)
+            if (sd (ss$ss, na.rm = TRUE) > 0.1)
+                ks <- ss$kmin
+            message (cli::col_green (cli::symbol$star), " Loop (", niters,
+                     ") ks = ", ks)
+        }
 
         niters <- niters + 1
-        if (k == kold & ks == ksold)
-            opt <- TRUE
         if (niters > 10)
             break
     }
-    message ("\r", cli::symbol$tick, " Optimised fit; Iteration [",
-             niters, " in ", st, "s: (k, ks) = (", k, ", ", ks, ")")
-    st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
-                   format = "f", digits = 1)
-    message ()
-    if (opt)
-        txt <- "Optimised fit after "
-    else
-        txt <- "Failed to optimise fit after "
-    message (cli::rule (center = paste0 (txt, niters, " iterations and ", st,
-                                         "s: (k, ks) = (", k, ", ", ks, ")"),
-                        line = 2, col = "green"))
-    #parallel::stopCluster (cl)
+    message (cli::rule (center = "FINISHED", line = 2, col = "green"))
 
-    c ("k" = k, "k_scale" = ks)
+    c (k = k, ks = ks)
+}
+
+fit_one_k_disperse <- function (net, from, to, p, dp, s, data_dir, kvals,
+                                plot = FALSE)
+{
+    lspan <- 0.75 # fixed span of loess fits
+
+    v <- dodgr::dodgr_vertices (net)
+
+    # get fr_dat with columns of (id, n), where id is matched to v$id
+    if (from == "residential")
+    {
+        net <- reverse_net (net)
+        fr_dat <- get_res_dat (v, data_dir)
+    } else if (from == "subway")
+        fr_dat <- get_subway_dat (s)
+    else
+        fr_dat <- get_attractor_layer (data_dir, v, type = from)
+
+    ss <- rep (NA, length (kvals))
+    i <- NULL # suppress no visible binding note
+    pb <- txtProgressBar (style = 3)
+    for (i in seq (kvals)) {
+        temp <- disperse_one_layer (net, fr_dat, kvals [i], p, dp)
+        ss [i] <- temp$stats [4]
+        setTxtProgressBar (pb, i / length (x))
+        if (i > 2 & all (diff (ss [!is.na (ss)]) > 0))
+            break # lowest SS is first k
+    }
+    close (pb)
+
+    if (any (is.na (ss))) # if SS progressively increases with first k-values
+        return (list (k = kvals, ss = ss, kmin = kvals [1]))
+
+    mod <- stats::loess (ss ~ kvals, span = lspan)
+    kvals2 <- NULL # no visible binding message
+    fit <- stats::predict (mod, newdata = data.frame (kvals2 = kvals))
+    if (plot)
+    {
+        plot (kvals, ss, pch = 2, col = "orange")
+        lines (kvals, fit, col = "red", lwd = 2)
+    }
+    sdlim <- 2 * stats::sd (mod$residuals)
+    n <- length (which (abs (mod$residuals) > sdlim))
+    if (n > 0 & n < 3 & length (kvals) > 6) # remove extreme values
+    {
+        index <- which (abs (mod$residuals) <= sdlim)
+        kvals2 <- kvals [index]
+        y <- ss [index]
+        mod2 <- tryCatch ({
+            stats::loess (y ~ kvals2, span = lspan)},
+            warning = function (w) { NULL },
+            error = function (e) { NULL })
+        if (!is.null (mod2))
+            fit <- stats::predict (mod2, newdata = data.frame (kvals2 = kvals))
+        if (plot)
+            lines (kvals, fit, col = "red", lwd = 2, lty = 2)
+    }
+    res <- kvals [which.min (fit)]
+    if (plot)
+        points (res, ss [res], pch = 19, col = "red", cex = 2)
+
+    return (list (k = kvals, ss = ss, kmin = res))
 }
 
 fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
@@ -133,49 +252,41 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
 
     ss <- rep (NA, length (x))
     i <- NULL # suppress no visible binding note
-    if (to == "disperse")
-    {
-        for (i in seq (x)) {
-            ss [i] <- disperse_one_layer (net, fr_dat, ki [i], ksi [i],
-                                          p, dp) [4]
-        }
-        #ss <- foreach::foreach (i = seq (x)) %dopar%
-        #    disperse_one_layer (net, fr_dat, ki [i], ksi [i], p, dp) [4]
-        #ss <- unlist (ss)
-    } else
-    {
-        if (to == "residential")
-            to_dat <- get_res_dat (v, data_dir)
-        else if (to == "subway")
-            to_dat <- get_subway_dat (s)
-        else
-            to_dat <- get_attractor_layer (data_dir, v, type = to)
+    pb <- txtProgressBar (style = 3)
+    if (to == "residential")
+        to_dat <- get_res_dat (v, data_dir)
+    else if (to == "subway")
+        to_dat <- get_subway_dat (s)
+    else
+        to_dat <- get_attractor_layer (data_dir, v, type = to)
 
-        nfr <- nrow (fr_dat)
-        nto <- nrow (to_dat)
+    dmat <- dodgr::dodgr_distances (net, from = fr_dat$id, to = to_dat$id)
+    dmat [is.na (dmat)] <- max (dmat, na.rm = TRUE)
 
-        dmat <- dodgr::dodgr_distances (net, from = fr_dat$id, to = to_dat$id)
-        dmat [is.na (dmat)] <- max (dmat, na.rm = TRUE)
-
-        for (i in seq (x)) {
-            ss [i] <- aggregate_one_layer (net, fr_dat, to_dat, ki [i],
-                                           ksi [i], p, dp, dmat) [4]
-        }
-        #ss <- foreach::foreach (i = seq (x)) %dopar%
-        #    aggregate_one_layer (net, fr_dat, to_dat, ki [i],
-        #                         ksi [i], p, dp, dmat)
-        #ss <- unlist (ss)
+    for (i in seq (x)) {
+        temp <- aggregate_one_layer (net, fr_dat, to_dat, ki [i],
+                                     ksi [i], p, dp, dmat)
+        ss [i] <- temp$stats [4]
+        setTxtProgressBar (pb, i / length (x))
+        if (i > 2 & all (diff (ss [!is.na (ss)]) > 0))
+            break # lowest SS is first k
     }
+    close (pb)
+
+    if (any (is.na (ss))) # if SS progressively increases with first k-values
+        return (list (k = x, ss = ss, kmin = x [1]))
 
     mod <- stats::loess (ss ~ x, span = lspan)
+    x2 <- NULL # no visible binding message
+    fit <- stats::predict (mod, newdata = data.frame (x2 = x))
     if (plot)
     {
-        plot (x, ss, pch = 2, col ="orange")
-        lines (x, mod$fitted, col = "red", lwd = 2)
+        plot (x, ss, pch = 2, col = "orange")
+        lines (x, fit, col = "red", lwd = 2)
     }
     sdlim <- 2 * stats::sd (mod$residuals)
     n <- length (which (abs (mod$residuals) > sdlim))
-    if (n > 0 & n < 3) # remove extreme values
+    if (n > 0 & n < 3 & length (x) > 6) # remove extreme values
     {
         index <- which (abs (mod$residuals) <= sdlim)
         x2 <- x [index]
@@ -185,19 +296,15 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
             warning = function (w) { NULL },
             error = function (e) { NULL })
         if (!is.null (mod2))
-            mod <- mod2
-        fit <- stats::predict (mod, newdata = data.frame (x2 = x))
+            fit <- stats::predict (mod2, newdata = data.frame (x2 = x))
         if (plot)
             lines (x, fit, col = "red", lwd = 2, lty = 2)
-        res <- x [which.min (fit)]
-    } else
-    {
-        res <- x [which.min (mod$fitted)]
     }
+    res <- x [which.min (fit)]
     if (plot)
         points (res, ss [res], pch = 19, col = "red", cex = 2)
 
-    return (res)
+    return (list (k = x, ss = ss, kmin = res))
 }
 
 reverse_net <- function (net)
@@ -248,29 +355,19 @@ get_subway_dat <- function (s)
                 stringsAsFactors = FALSE)
 }
 
-disperse_one_layer <- function (net, fr_dat, k, ks, p, dp)
+disperse_one_layer <- function (net, fr_dat, k, p, dp)
 {
-    kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
-    net_f <- NULL
-    while (is.null (net_f))
-    {
-        # dispersal sometimes errors in parallel aggregation
-        net_f <- tryCatch ({
-            dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
-                                         dens = fr_dat$n, k = kvals) },
-            error = function (e) { NULL },
-            warning = function (w) { NULL })
-    }
-    #net_f <- dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
-    #                                      dens = fr_dat$n, k = kvals)
+    net_f <- dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
+                                          dens = fr_dat$n, k = k)
     flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
     p$flows <- flows
 
     mod <- summary (stats::lm (p$week ~ p$flows))
     list (stats = c (k = k,
-                     k_scale = ks,
+                     k_scale = NA,
                      r2 = mod$adj.r.squared,
-                     ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6),
+                     ss = sum (mod$residuals ^ 2) /
+                         length (mod$residuals) / 1e6),
           p = p)
 }
 
@@ -283,7 +380,6 @@ aggregate_one_layer <- function (net, fr_dat, to_dat, k, ks, p, dp, dmat)
     kmat <- matrix (kvals, nrow = nfr, ncol = nto)
 
     frmat <- matrix (fr_dat$n, nrow = nfr, ncol = nto)
-    tomat <- t (matrix (to_dat$n, nrow = nto, ncol = nfr))
 
     emat <- frmat * exp (-dmat / kmat)
     # the first constraint, to unit sums over all destinations (columns)
@@ -313,6 +409,7 @@ aggregate_one_layer <- function (net, fr_dat, to_dat, k, ks, p, dp, dmat)
     list (stats = c (k = k,
                      k_scale = ks,
                      r2 = mod$adj.r.squared,
-                     ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6),
+                     ss = sum (mod$residuals ^ 2) /
+                         length (mod$residuals) / 1e6),
           p = p)
 }

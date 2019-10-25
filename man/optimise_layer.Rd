@@ -21,5 +21,7 @@ been, downloaded.}
 }
 \description{
 Optimise `k` and `k_scale` parameters to optimally fit flow layer to observed
-pedestrian densities
+pedestrian densities. Note that optimisation can't be implemented directly
+because results are too noisy, so a series of custom ranges is scanned, and
+optimal values found from loess fits.
 }

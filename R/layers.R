@@ -377,10 +377,18 @@ layer_disperse <- function (net, from = "subway", data_dir, p, dp, s,
         k = k ^ (1 + k_scale * s$count2018 / max (s$count2018))
         dens <- s$count2018
         pts <- s$id
+    } else if (from == "centrality")
+    {
+        v <- dodgr::dodgr_vertices (net)
+        cent <- readRDS (file.path (data_dir, "ny-centrality-vertex.Rds"))
+        cent <- cent [cent$id %in% v$id, ]
+        k <- k ^ (1 + k_scale * cent$centrality / max (cent$centrality))
+        dens <- cent$centrality
+        pts <- cent$id
     } else
     {
         a <- get_attractor_layer (data_dir, v, type = from)
-        k = k ^ (1 + k_scale * a$n / max (a$n))
+        k <- k ^ (1 + k_scale * a$n / max (a$n))
         dens <- a$n
         pts <- a$id
     }
@@ -593,8 +601,14 @@ get_attractor_layer <- function (data_dir, v, type = "education")
 {
     type <- match.arg (type, c ("residential", "education", "entertainment",
                                 "healthcare", "sustenance", "transportation",
-                                "disperse"))
-    a <- readRDS (file.path (data_dir, "osm", "ny-attractors.Rds"))
+                                "disperse", "centrality"))
+    a <- NULL
+    if (type == "centrality")
+    {
+        a <- readRDS (file.path (data_dir, "ny-centrality-vertex.Rds"))
+        a$category <- "centrality"
+    } else
+        a <- readRDS (file.path (data_dir, "osm", "ny-attractors.Rds"))
     # The attractors data contains lots of points outside the bbox of the street
     # network, so have to be reduced to only those within. (Otherwise *ALL*
     # points beyond get aggregated to nearest points, producing anomalously huge
@@ -603,9 +617,10 @@ get_attractor_layer <- function (data_dir, v, type = "education")
     bb <- osmdata::getbb ("new york city", format_out = "sf_polygon")
     suppressMessages (index <- sf::st_contains (bb, pts) [[1]])
     a <- a [index, ]
-    # a has OSM id's, but these need to be re-matched to values in the actual
-    # street network
-    a$id <- v$id [dodgr::match_points_to_graph (v, a [, c ("x", "y")])]
+    # a for ny-attractors has OSM id's, but these need to be re-matched to
+    # values in the actual street network
+    if (type != "centrality")
+        a$id <- v$id [dodgr::match_points_to_graph (v, a [, c ("x", "y")])]
     id <- capacity <- NULL # no visible binding note
     a <- a [a$category == type, ]
     if (type == "transportation")
@@ -624,17 +639,23 @@ get_attractor_layer <- function (data_dir, v, type = "education")
             dplyr::summarise (n = sum (capacity))
     } else
     {
-        if (type == "entertainment")
-            a <- a [a$amenity != "fountain", ]
+        if (type == "centrality")
+            names (a) [which (names (a) == "centrality")] <- "n"
+        else
+        {
+            if (type == "entertainment")
+                a <- a [a$amenity != "fountain", ]
 
-        a <- dplyr::select (a, c ("id", "x", "y")) %>%
-            dplyr::group_by (id) %>%
-            dplyr::summarise (n = length (id))
+            a <- dplyr::select (a, c ("id", "x", "y")) %>%
+                dplyr::group_by (id) %>%
+                dplyr::summarise (n = length (id))
+        }
+
+        # then put the coordinates back from the graph vertices
+        index <- match (a$id, v$id)
+        a$x <- v$x [index]
+        a$y <- v$y [index]
     }
-    # then put the coordinates back from the graph vertices
-    index <- match (a$id, v$id)
-    a$x <- v$x [index]
-    a$y <- v$y [index]
 
     return (a)
 }
