@@ -4,10 +4,13 @@
 \alias{centrality_edge_to_point}
 \title{centrality_edge_to_point}
 \usage{
-centrality_edge_to_point(data_dir)
+centrality_edge_to_point(data_dir, save = FALSE)
 }
 \arguments{
 \item{data_dir}{The data directory}
+
+\item{save}{If `TRUE`, save resultant vertex-based centrality measures in
+`data_dir`.}
 }
 \value{
 Equivalent point- or vertex-based measures of centrality

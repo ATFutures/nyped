@@ -17,6 +17,7 @@ centrality_edge_to_point <- function (data_dir, save = FALSE)
     net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
     v <- dodgr::dodgr_vertices (net)
 
+    .vx1 <- .vx1_x <- .vx1_y <- NULL # no visible binding notes
     cent_e <- readRDS (file.path (data_dir, "ny-centrality-edge.Rds"))
     cent_v <- dplyr::group_by (cent_e, .vx1) %>%
         dplyr::summarise (id = min (.vx1),
