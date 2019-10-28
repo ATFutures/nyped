@@ -5,9 +5,19 @@
 #' results are too noisy, so a series of custom ranges is scanned, and optimal
 #' values found from loess fits.
 #'
-#' @inheritParams ny_layer
+#' @param net Weighted street network; loaded from `data_dir` if not provided
+#' @param from Category of origins for pedestrian flows; one of "subway" or
+#' "residential"
+#' @param to Category of destinations for pedestrian flows; one of
+#' "residential", "education", "entertainment", "healthcare", "sustenance",
+#' "transportation", or "disperse" for a general dispersal model.
+#' @param data_dir The directory in which data are to be, or have previously
+#' been, downloaded.
+#' @param cache If `TRUE`, layers are cached in a sub-directory of `data_dir`
+#' for later reloading.
 #' @export
-optim_layer1 <- function (net, from = "subway", to = "disperse", data_dir)
+optim_layer1 <- function (net, from = "subway", to = "disperse", data_dir,
+                          cache = TRUE)
 {
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
@@ -28,10 +38,10 @@ optim_layer1 <- function (net, from = "subway", to = "disperse", data_dir)
         message (cli::col_cyan (cli::symbol$star), " ", prfx [i], " k values [", 
                  paste0 (range (kvals), collapse = " -> "), "]")
         ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals,
-                          fitk = TRUE)
+                          fitk = TRUE, cache = cache)
         k <- ss$kmin
         message (cli::col_green (cli::symbol$star), " ", prfx [i],
-                 " k value = ", k, "; r2 = ", ss$r2)
+                 " k value = ", k, "; r2 = ", signif (ss$r2, 3))
     }
 
     message (cli::rule (center = "FINISHED", line = 2, col = "green"))
@@ -46,7 +56,7 @@ optim_layer1 <- function (net, from = "subway", to = "disperse", data_dir)
 #' because results are too noisy, so a series of custom ranges is scanned, and
 #' optimal values found from loess fits.
 #'
-#' @inheritParams ny_layer
+#' @inheritParams optim_layer1
 #' @export
 optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
                           data_dir)
@@ -181,8 +191,13 @@ optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
     c (k = k, ks = ks)
 }
 
+    #chk <- FALSE
+    #if (cache)
+    #    chk <- is_layer_cached (data_dir, from, to, k, k_scale)
+    #res <- get_layer (net, data_dir, from, to, k, k_scale, cache, quiet)
+
 fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
-                        fitk = TRUE, plot = FALSE)
+                        fitk = TRUE, cache = TRUE, plot = FALSE)
 {
     lspan <- 0.75 # fixed span of loess fits
     if (fitk)
@@ -213,7 +228,8 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
     if (to == "disperse")
     {
         for (i in seq (x)) {
-            temp <- disperse_one_layer (net, fr_dat, ki [i], ksi [i], p, dp)
+            temp <- disperse_one_layer (net, fr_dat, ki [i], ksi [i], p, dp,
+                                        cache = cache)
             r2 [i] <- temp$stats [3]
             ss [i] <- temp$stats [4]
             setTxtProgressBar (pb, i / length (x))
@@ -234,7 +250,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
 
         for (i in seq (x)) {
             temp <- aggregate_one_layer (net, fr_dat, to_dat, ki [i],
-                                         ksi [i], p, dp, dmat)
+                                         ksi [i], p, dp, dmat, cache = cache)
             r2 [i] <- temp$stats [3]
             ss [i] <- temp$stats [4]
             setTxtProgressBar (pb, i / length (x))
@@ -325,21 +341,20 @@ get_subway_dat <- function (s)
                 stringsAsFactors = FALSE)
 }
 
-disperse_one_layer <- function (net, fr_dat, k, ks, p, dp)
+disperse_one_layer <- function (net, fr_dat, k, ks, p, dp, cache = TRUE)
 {
-    kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
-    net_f <- NULL
-    while (is.null (net_f))
+    f <- get_file_name (data_dir, from, to, k, ks)
+    if (file.exists (f) & cache)
     {
-        # dispersal sometimes errors in parallel aggregation
-        net_f <- tryCatch ({
-            dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
-                                         dens = fr_dat$n, k = kvals) },
-            error = function (e) { NULL },
-            warning = function (w) { NULL })
+        net_f <- readRDS (f)
+    } else
+    {
+        kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
+        net_f <- dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
+                                              dens = fr_dat$n, k = kvals)
+        if (cache)
+            cache_layer (net_f, data_dir, from, to, k, ks)
     }
-    #net_f <- dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
-    #                                      dens = fr_dat$n, k = kvals)
     flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
     p$flows <- flows
 
@@ -352,37 +367,47 @@ disperse_one_layer <- function (net, fr_dat, k, ks, p, dp)
           p = p)
 }
 
-aggregate_one_layer <- function (net, fr_dat, to_dat, k, ks, p, dp, dmat)
+aggregate_one_layer <- function (net, fr_dat, to_dat, k, ks, p, dp, dmat,
+                                 cache = TRUE)
 {
-    nfr <- nrow (fr_dat)
-    nto <- nrow (to_dat)
-
-    kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
-    kmat <- matrix (kvals, nrow = nfr, ncol = nto)
-
-    frmat <- matrix (fr_dat$n, nrow = nfr, ncol = nto)
-
-    emat <- frmat * exp (-dmat / kmat)
-    # the first constraint, to unit sums over all destinations (columns)
-    # from each origin (row)
-    cmat <- t (matrix (colSums (emat), nrow = nto, ncol = nfr))
-    emat <- emat / cmat
-    # the second constraint, so each origin (row) allocates fr$n to all
-    # destinations (columns)
-    fmat <- frmat * emat / nto
-
-    net_f <- NULL
-    while (is.null (net_f))
+    f <- get_file_name (data_dir, from, to, k, ks)
+    if (file.exists (f) & cache)
     {
-        # aggregation sometimes errors in parallel aggregation
-        net_f <- tryCatch ({
-            dodgr::dodgr_flows_aggregate (net, from = fr_dat$id,
-                                          to = to_dat$id, flows = fmat) },
-            error = function (e) { NULL },
-            warning = function (w) { NULL })
+        net_f <- readRDS (f)
+    } else
+    {
+        nfr <- nrow (fr_dat)
+        nto <- nrow (to_dat)
+
+        kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
+        kmat <- matrix (kvals, nrow = nfr, ncol = nto)
+
+        frmat <- matrix (fr_dat$n, nrow = nfr, ncol = nto)
+
+        emat <- frmat * exp (-dmat / kmat)
+        # the first constraint, to unit sums over all destinations (columns)
+        # from each origin (row)
+        cmat <- t (matrix (colSums (emat), nrow = nto, ncol = nfr))
+        emat <- emat / cmat
+        # the second constraint, so each origin (row) allocates fr$n to all
+        # destinations (columns)
+        fmat <- frmat * emat / nto
+
+        net_f <- NULL
+        while (is.null (net_f))
+        {
+            # aggregation sometimes errors in parallel aggregation
+            net_f <- tryCatch ({
+                dodgr::dodgr_flows_aggregate (net, from = fr_dat$id,
+                                              to = to_dat$id, flows = fmat) },
+                error = function (e) { NULL },
+                warning = function (w) { NULL })
+        }
+        #net_f <- dodgr::dodgr_flows_aggregate (net, from = fr_dat$id,
+        #                                       to = to_dat$id, flows = fmat)
+        if (cache)
+            cache_layer (net_f, data_dir, from, to, k, ks)
     }
-    #net_f <- dodgr::dodgr_flows_aggregate (net, from = fr_dat$id,
-    #                                       to = to_dat$id, flows = fmat)
     flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
     p$flows <- flows
 

@@ -1,64 +1,3 @@
-#' ny_layer
-#'
-#' Calculate one flow layer of pedestrian densities for New York City
-#'
-#' @param net Weighted street network; loaded from `data_dir` if not provided
-#' @param from Category of origins for pedestrian flows; one of "subway" or
-#' "residential"
-#' @param to Category of destinations for pedestrian flows; one of
-#' "residential", "education", "entertainment", "healthcare", "sustenance",
-#' "transportation", or "disperse" for a general dispersal model.
-#' @param k Width of exponential decay (in m) for spatial interaction models
-#' @param k_scale Scale `k` to size of origins (`s`), so `k = k ^ (1 + s /
-#' smax)`.
-#' @param data_dir The directory in which data are to be, or have previously
-#' been, downloaded.
-#' @param cache If `TRUE`, layers are cached in a sub-directory of `data_dir`
-#' for later reloading.
-#' @param quiet If `FALSE`, display progress information on screen
-#' @export
-ny_layer <- function (net = NULL, from = "subway", to = "activity",
-                      k = 700, k_scale = 0, data_dir, cache = TRUE, quiet = FALSE)
-{
-    targets <- c ("residential", "education", "entertainment", "healthcare",
-                  "sustenance", "transportation", "disperse", "subway")
-    to <- match.arg (to, targets)
-    from <- match.arg (from, targets)
-
-    if (from == "residential")
-        to <- "subway"
-
-    if (!quiet)
-        message (cli::rule (center = get_header_txt (from, to),
-                            line = 2, col = "green"))
-
-    st0 <- Sys.time ()
-    if (is.null (net))
-    {
-        f <- file.path (data_dir, "osm", "ny-hw.Rds")
-        hw <- readRDS (f)
-        dodgr::dodgr_cache_off ()
-        if (!quiet)
-            message (cli::symbol$pointer, " Weighting street network",
-                     appendLF = FALSE)
-        net <- dodgr::weight_streetnet (hw, wt_profile = "foot")
-        if (!quiet)
-            message ("\r", cli::symbol$tick, " Weighted street network ")
-    }
-
-    chk <- FALSE
-    if (cache)
-        chk <- is_layer_cached (data_dir, from, to, k, k_scale)
-    res <- get_layer (net, data_dir, from, to, k, k_scale, cache, quiet)
-
-    st <- formatC (as.numeric (difftime (Sys.time (), st0, units = "sec")),
-                   format = "f", digits = 1)
-    if (!quiet & !chk)
-        message (cli::rule (center = paste0 ("Finished in ", st, "s"),
-                            line = 2, col = "green"))
-
-    return (res)
-}
 
 # ********************************************************************
 # ********************   FILE UTILITY FUNCTIONS   ********************   
@@ -158,8 +97,8 @@ calc_layer <- function (net, data_dir, from, to, k, k_scale, p, dp, s, cache, qu
 
 cache_layer <- function (res, data_dir, from, to, k, k_scale)
 {
-    # save only id and flow columns - this removes (X,Y) + pedestrian count cols
-    res <- res [, c ("id", "flows")]
+    # save only the necessary columns
+    res <- res [, c (".vx0", ".vx1", "edge_", "flow")]
 
     f <- get_file_name (data_dir, from, to, k, k_scale)
     saveRDS (res, f)
