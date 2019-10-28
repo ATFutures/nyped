@@ -4,8 +4,8 @@
 \alias{optim_layer1}
 \title{optim_layer1}
 \usage{
-optim_layer1(net, from = "subway", to = "disperse", data_dir,
-  cache = TRUE)
+optim_layer1(net, from = "subway", to = "disperse", flowvars = NULL,
+  data_dir, cache = TRUE)
 }
 \arguments{
 \item{net}{Weighted street network; loaded from `data_dir` if not provided}
@@ -16,6 +16,11 @@ optim_layer1(net, from = "subway", to = "disperse", data_dir,
 \item{to}{Category of destinations for pedestrian flows; one of
 "residential", "education", "entertainment", "healthcare", "sustenance",
 "transportation", or "disperse" for a general dispersal model.}
+
+\item{flowvars}{A `data.frame` of flows from previously calculated layers. If
+provided, these are included in the model, and the target layer is optimised
+as part of a multiple linear regression which includes these variables. Must
+have same number of rows as `net`.}
 
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}

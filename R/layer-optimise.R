@@ -11,13 +11,17 @@
 #' @param to Category of destinations for pedestrian flows; one of
 #' "residential", "education", "entertainment", "healthcare", "sustenance",
 #' "transportation", or "disperse" for a general dispersal model.
+#' @param flowvars A `data.frame` of flows from previously calculated layers. If
+#' provided, these are included in the model, and the target layer is optimised
+#' as part of a multiple linear regression which includes these variables. Must
+#' have same number of rows as `net`.
 #' @param data_dir The directory in which data are to be, or have previously
 #' been, downloaded.
 #' @param cache If `TRUE`, layers are cached in a sub-directory of `data_dir`
 #' for later reloading.
 #' @export
-optim_layer1 <- function (net, from = "subway", to = "disperse", data_dir,
-                          cache = TRUE)
+optim_layer1 <- function (net, from = "subway", to = "disperse", flowvars = NULL,
+                          data_dir, cache = TRUE)
 {
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
@@ -37,8 +41,8 @@ optim_layer1 <- function (net, from = "subway", to = "disperse", data_dir,
         kvals <- kvals [which (kvals > 0)]
         message (cli::col_cyan (cli::symbol$star), " ", prfx [i], " k values [", 
                  paste0 (range (kvals), collapse = " -> "), "]")
-        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals,
-                          fitk = TRUE, cache = cache)
+        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
+                          kvals, fitk = TRUE, cache = cache)
         k <- ss$kmin
         message (cli::col_green (cli::symbol$star), " ", prfx [i],
                  " k value = ", k, "; r2 = ", signif (ss$r2, 3))
@@ -48,14 +52,14 @@ optim_layer1 <- function (net, from = "subway", to = "disperse", data_dir,
     label <- c (paste (star, from, " -> ", to, star),
                 paste ("k = ", ss$kmin),
                 paste (expression (R^2), " = ", signif (ss$r2, 3)))
-    cli::boxx (
-         cli::col_white (label),
-         border_style="round",
-         padding = 1,
-         float = "center",
-         border_col = "tomato3",
-         background_col = "deepskyblue"
-    )
+    message (cli::boxx (
+                        cli::col_white (label),
+                        border_style="round",
+                        padding = 1,
+                        float = "center",
+                        border_col = "tomato3",
+                        background_col = "deepskyblue"
+                        ))
     message (cli::rule (center = "FINISHED", line = 2, col = "green"), "\n")
 
     return (ss [3:4]) # (k, r2)
@@ -204,13 +208,8 @@ optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
     c (k = k, ks = ks)
 }
 
-    #chk <- FALSE
-    #if (cache)
-    #    chk <- is_layer_cached (data_dir, from, to, k, k_scale)
-    #res <- get_layer (net, data_dir, from, to, k, k_scale, cache, quiet)
-
-fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
-                        fitk = TRUE, cache = TRUE, plot = FALSE)
+fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
+                        kvals, fitk = TRUE, cache = TRUE, plot = FALSE)
 {
     lspan <- 0.75 # fixed span of loess fits
     if (fitk)
@@ -242,7 +241,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
     {
         for (i in seq (x)) {
             temp <- disperse_one_layer (net, from, fr_dat, ki [i], ksi [i], p, dp,
-                                        data_dir, cache = cache)
+                                        flowvars, data_dir, cache = cache)
             r2 [i] <- temp$stats [3]
             ss [i] <- temp$stats [4]
             utils::setTxtProgressBar (pb, i / length (x))
@@ -264,7 +263,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
         for (i in seq (x)) {
             temp <- aggregate_one_layer (net, from, to, fr_dat, to_dat,
                                          ki [i], ksi [i], p, dp, dmat,
-                                         data_dir, cache = cache)
+                                         flowvars, data_dir, cache = cache)
             r2 [i] <- temp$stats [3]
             ss [i] <- temp$stats [4]
             utils::setTxtProgressBar (pb, i / length (x))
@@ -305,6 +304,55 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
         graphics::points (x [i], ss [i], pch = 19, col = "red", cex = 2)
 
     return (list (k = x, ss = ss, kmin = x [i], r2 = r2 [i]))
+}
+
+#' calc_layer
+#' Calculate a single layer from specified origin and destination categories,
+#' using specific values of 'k' and 'ks'.
+#'
+#' @inheritParams optim_layer2
+#' @param k_scale Scale `k` to size of origins (`s`), so
+#' `k = k ^ (1 + s / smax)`.
+#' @export
+calc_layer <- function (net, from = "subway", to = "disperse", k, k_scale, data_dir)
+{
+    p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
+    s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
+    net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
+    dp <- dodgr::dodgr_dists (net, from = p$id)
+    v <- dodgr::dodgr_vertices (net)
+
+    if (from == "residential")
+    {
+        net <- reverse_net (net)
+        fr_dat <- get_res_dat (v, data_dir)
+    } else if (from == "subway")
+        fr_dat <- get_subway_dat (s)
+    else
+        fr_dat <- get_attractor_layer (data_dir, v, type = from)
+
+    if (to == "disperse")
+    {
+        temp <- disperse_one_layer (net, from, fr_dat, k, k_scale, p, dp,
+                                    flowvars = NULL, data_dir, cache = TRUE)
+    } else
+    {
+        if (to == "residential")
+            to_dat <- get_res_dat (v, data_dir)
+        else if (to == "subway")
+            to_dat <- get_subway_dat (s)
+        else
+            to_dat <- get_attractor_layer (data_dir, v, type = to)
+
+        dmat <- dodgr::dodgr_distances (net, from = fr_dat$id, to = to_dat$id)
+        dmat [is.na (dmat)] <- max (dmat, na.rm = TRUE)
+
+        temp <- aggregate_one_layer (net, from, to, fr_dat, to_dat,
+                                     k, k_scale, p, dp, dmat,
+                                     flowvars = NULL, data_dir, cache = TRUE)
+    }
+
+    return (temp)
 }
 
 reverse_net <- function (net)
@@ -355,8 +403,8 @@ get_subway_dat <- function (s)
                 stringsAsFactors = FALSE)
 }
 
-disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, data_dir,
-                                cache = TRUE)
+disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, flowvars,
+                                data_dir, cache = TRUE)
 {
     to <- "disperse"
     f <- get_file_name (data_dir, from, to, k, ks)
@@ -372,9 +420,10 @@ disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, data_dir,
             cache_layer (net_f, data_dir, from, to, k, ks)
     }
     flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
-    p$flows <- flows
+    flowvars <- rbind (flowvars, flows)
+    p$flow <- flows
 
-    mod <- summary (stats::lm (p$week ~ p$flows))
+    mod <- summary (stats::lm (p$week ~ flows))
     list (stats = c (k = k,
                      k_scale = ks,
                      r2 = mod$adj.r.squared,
@@ -384,7 +433,7 @@ disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, data_dir,
 }
 
 aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
-                                 dmat, data_dir, cache = TRUE)
+                                 dmat, flowvars, data_dir, cache = TRUE)
 {
     f <- get_file_name (data_dir, from, to, k, ks)
     if (file.exists (f) & cache)
@@ -425,9 +474,10 @@ aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
             cache_layer (net_f, data_dir, from, to, k, ks)
     }
     flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
-    p$flows <- flows
+    flowvars <- cbind (flowvars, flows)
+    p$flow <- flows
 
-    mod <- summary (stats::lm (p$week ~ p$flows))
+    mod <- summary (stats::lm (p$week ~ flowvars))
     list (stats = c (k = k,
                      k_scale = ks,
                      r2 = mod$adj.r.squared,
