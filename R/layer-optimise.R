@@ -44,9 +44,21 @@ optim_layer1 <- function (net, from = "subway", to = "disperse", data_dir,
                  " k value = ", k, "; r2 = ", signif (ss$r2, 3))
     }
 
-    message (cli::rule (center = "FINISHED", line = 2, col = "green"))
+    star <- cli::symbol$star
+    label <- c (paste (star, from, " -> ", to, star),
+                paste ("k = ", ss$kmin),
+                paste (expression (R^2), " = ", signif (ss$r2, 3)))
+    cli::boxx (
+         cli::col_white (label),
+         border_style="round",
+         padding = 1,
+         float = "center",
+         border_col = "tomato3",
+         background_col = "deepskyblue"
+    )
+    message (cli::rule (center = "FINISHED", line = 2, col = "green"), "\n")
 
-    return (ss [3:4]) # (ss, r2)
+    return (ss [3:4]) # (k, r2)
 }
 
 #' optim_layer2
