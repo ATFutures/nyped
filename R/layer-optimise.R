@@ -148,7 +148,7 @@ optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
                  ") k values [", min (kvals), " -> ", max (kvals), "]")
         ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir,
                      kvals, fitk = TRUE)
-        if (sd (ss$ss, na.rm = TRUE) > 0.1)
+        if (stats::sd (ss$ss, na.rm = TRUE) > 0.1)
             k <- ss$kmin
         message (cli::col_green (cli::symbol$star), " Loop (", niters,
                  ") k = ", k)
@@ -170,7 +170,7 @@ optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
             if (niters2 > 10)
                 break
         }
-        if (sd (ss$ss, na.rm = TRUE) > 0.1)
+        if (stats::sd (ss$ss, na.rm = TRUE) > 0.1)
             k <- ss$kmin # 200
 
         ksvals <- ks + (-5:5) / 10
@@ -178,7 +178,7 @@ optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
                  ") ks values [", min (ksvals), " -> ", max (ksvals), "]")
         ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir,
                      ksvals, fitk = FALSE)
-        if (sd (ss$ss, na.rm = TRUE) > 0.1)
+        if (stats::sd (ss$ss, na.rm = TRUE) > 0.1)
             ks <- ss$kmin
         message (cli::col_green (cli::symbol$star), " Loop (", niters,
                  ") ks = ", ks)
@@ -225,7 +225,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
 
     ss <- r2 <- rep (NA, length (x))
     i <- NULL # suppress no visible binding note
-    pb <- txtProgressBar (style = 3)
+    pb <- utils::txtProgressBar (style = 3)
     if (to == "disperse")
     {
         for (i in seq (x)) {
@@ -233,7 +233,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
                                         data_dir, cache = cache)
             r2 [i] <- temp$stats [3]
             ss [i] <- temp$stats [4]
-            setTxtProgressBar (pb, i / length (x))
+            utils::setTxtProgressBar (pb, i / length (x))
             if (i > 2 & all (diff (ss [!is.na (ss)]) > 0))
                 break # lowest SS is first k
         }
@@ -255,7 +255,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
                                          data_dir, cache = cache)
             r2 [i] <- temp$stats [3]
             ss [i] <- temp$stats [4]
-            setTxtProgressBar (pb, i / length (x))
+            utils::setTxtProgressBar (pb, i / length (x))
             if (i > 2 & all (diff (ss [!is.na (ss)]) > 0))
                 break # lowest SS is first k
         }
@@ -270,7 +270,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
     if (plot)
     {
         plot (x, ss, pch = 2, col = "orange")
-        lines (x, fit, col = "red", lwd = 2)
+        graphics::lines (x, fit, col = "red", lwd = 2)
     }
     sdlim <- 2 * stats::sd (mod$residuals)
     n <- length (which (abs (mod$residuals) > sdlim))
@@ -286,11 +286,11 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
         if (!is.null (mod2))
             fit <- stats::predict (mod2, newdata = data.frame (x2 = x))
         if (plot)
-            lines (x, fit, col = "red", lwd = 2, lty = 2)
+            graphics::lines (x, fit, col = "red", lwd = 2, lty = 2)
     }
     i <- which.min (fit)
     if (plot)
-        points (x [i], ss [i], pch = 19, col = "red", cex = 2)
+        graphics::points (x [i], ss [i], pch = 19, col = "red", cex = 2)
 
     return (list (k = x, ss = ss, kmin = x [i], r2 = r2 [i]))
 }
@@ -346,7 +346,8 @@ get_subway_dat <- function (s)
 disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, data_dir,
                                 cache = TRUE)
 {
-    f <- get_file_name (data_dir, from, to = "disperse", k, ks)
+    to <- "disperse"
+    f <- get_file_name (data_dir, from, to, k, ks)
     if (file.exists (f) & cache)
     {
         net_f <- readRDS (f)

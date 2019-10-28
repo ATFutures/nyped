@@ -195,31 +195,3 @@ get_attractor_layer <- function (data_dir, v, type = "education")
 
     return (a)
 }
-
-
-#' fit_one_layer
-#'
-#' Calculate fit for one layer with observed pedestrian counts, and return both
-#' sum of squared errors, and R-squared value
-#'
-#' @inheritParams optim_layer1
-#' @param k Width of exponential decay (in m) for spatial interaction models
-#' @param k_scale Scale `k` to size of origins (`s`), so `k = k ^ (1 + s /
-#' smax)`.
-#' @param quiet If `FALSE`, display progress info on screen
-#' @return Vector containing R-squared statistic and sum of squared errors for
-#' fitted mode (divided by 1e6)
-#' @export
-fit_one_layer <- function (net = NULL, from = "subway", to = "activity",
-                           k = 700, k_scale = 0, data_dir, cache = FALSE,
-                           quiet = FALSE)
-{
-    res <- ny_layer (net = net, from = from, to = to, k = k, k_scale = k_scale,
-                     data_dir = data_dir, cache = cache, quiet = quiet)
-    p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
-    mod <- summary (stats::lm (p$week ~ res$flows))
-    c (k = k,
-       k_scale = k_scale,
-       r2 = mod$adj.r.squared,
-       ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6)
-}
