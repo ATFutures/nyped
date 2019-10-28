@@ -56,6 +56,7 @@ optim_layer1 <- function (net, from = "subway", to = "disperse", data_dir,
 #' because results are too noisy, so a series of custom ranges is scanned, and
 #' optimal values found from loess fits.
 #'
+#' @param k Width of exponential decay (in m) for spatial interaction models
 #' @inheritParams optim_layer1
 #' @export
 optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
@@ -228,8 +229,8 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
     if (to == "disperse")
     {
         for (i in seq (x)) {
-            temp <- disperse_one_layer (net, fr_dat, ki [i], ksi [i], p, dp,
-                                        cache = cache)
+            temp <- disperse_one_layer (net, from, fr_dat, ki [i], ksi [i], p, dp,
+                                        data_dir, cache = cache)
             r2 [i] <- temp$stats [3]
             ss [i] <- temp$stats [4]
             setTxtProgressBar (pb, i / length (x))
@@ -249,8 +250,9 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, data_dir, kvals,
         dmat [is.na (dmat)] <- max (dmat, na.rm = TRUE)
 
         for (i in seq (x)) {
-            temp <- aggregate_one_layer (net, fr_dat, to_dat, ki [i],
-                                         ksi [i], p, dp, dmat, cache = cache)
+            temp <- aggregate_one_layer (net, from, to, fr_dat, to_dat,
+                                         ki [i], ksi [i], p, dp, dmat,
+                                         data_dir, cache = cache)
             r2 [i] <- temp$stats [3]
             ss [i] <- temp$stats [4]
             setTxtProgressBar (pb, i / length (x))
@@ -341,9 +343,10 @@ get_subway_dat <- function (s)
                 stringsAsFactors = FALSE)
 }
 
-disperse_one_layer <- function (net, fr_dat, k, ks, p, dp, cache = TRUE)
+disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, data_dir,
+                                cache = TRUE)
 {
-    f <- get_file_name (data_dir, from, to, k, ks)
+    f <- get_file_name (data_dir, from, to = "disperse", k, ks)
     if (file.exists (f) & cache)
     {
         net_f <- readRDS (f)
@@ -367,8 +370,8 @@ disperse_one_layer <- function (net, fr_dat, k, ks, p, dp, cache = TRUE)
           p = p)
 }
 
-aggregate_one_layer <- function (net, fr_dat, to_dat, k, ks, p, dp, dmat,
-                                 cache = TRUE)
+aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
+                                 dmat, data_dir, cache = TRUE)
 {
     f <- get_file_name (data_dir, from, to, k, ks)
     if (file.exists (f) & cache)

@@ -17,36 +17,6 @@ get_header_txt <- function (from, to)
     return (txt)
 }
 
-get_layer <- function (net, data_dir, from, to, k, k_scale, cache, quiet)
-{
-    f <- get_file_name (data_dir, from, to, k, k_scale)
-
-    if (file.exists (f) & cache)
-    {
-        if (!quiet)
-            message (cli::symbol$tick, " Loaded cached layer")
-        res <- readRDS (f)
-    } else
-    {
-        p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
-        s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
-        dp <- dodgr::dodgr_dists (net, from = p$id)
-
-        if (!quiet)
-            message (cli::symbol$pointer, " Contracting street network",
-                     appendLF = FALSE)
-        net <- dodgr::dodgr_contract_graph (net,
-                                            verts = unique (c (p$id, s$id)))
-        if (!quiet)
-            message ("\r", cli::symbol$tick, " Contracted street network ")
-
-        res <- calc_layer (net, data_dir, from, to, k, k_scale, p, dp, s,
-                           cache, quiet)
-    }
-
-    return (res)
-}
-
 get_file_name <- function (data_dir, from, to, k, k_scale)
 {
     prfx <- ""
@@ -64,35 +34,6 @@ get_file_name <- function (data_dir, from, to, k, k_scale)
 is_layer_cached <- function (data_dir, from, to, k, k_scale)
 {
     file.exists (get_file_name (data_dir, from, to, k, k_scale))
-}
-
-calc_layer <- function (net, data_dir, from, to, k, k_scale, p, dp, s, cache, quiet)
-{
-    if (from == "residential")
-        res <- layer_subway_res (net, data_dir, p, dp, s, k = k, k_scale = k_scale,
-                                 reverse = TRUE, quiet = quiet)
-    else if (to == "residential")
-        res <- layer_subway_res (net, data_dir, p, dp, s, k = k, k_scale = k_scale,
-                                 reverse = FALSE, quiet = quiet)
-    else if (to == "disperse")
-        res <- layer_disperse (net, from = from, data_dir, p, dp, s, k = k,
-                               k_scale = k_scale, quiet = quiet)
-    else if (from == "subway")
-    {
-        if (to == "subway")
-            res <- layer_subway_subway (net, data_dir, p, dp, s,
-                                        k = k, k_scale = k_scale, quiet = quiet)
-        else
-            res <- layer_subway_attr (net, to = to, data_dir, p, dp, s,
-                                      k = k, k_scale = k_scale, quiet = quiet)
-    } else
-        res <- layer_attr_attr (net, from = from, to = to, data_dir, p, dp, s,
-                                k = k, k_scale = k_scale, quiet = quiet)
-
-    if (cache)
-        cache_layer (res, data_dir, from, to, k, k_scale)
-
-    return (res)
 }
 
 cache_layer <- function (res, data_dir, from, to, k, k_scale)
@@ -261,7 +202,11 @@ get_attractor_layer <- function (data_dir, v, type = "education")
 #' Calculate fit for one layer with observed pedestrian counts, and return both
 #' sum of squared errors, and R-squared value
 #'
-#' @inheritParams ny_layer
+#' @inheritParams optim_layer1
+#' @param k Width of exponential decay (in m) for spatial interaction models
+#' @param k_scale Scale `k` to size of origins (`s`), so `k = k ^ (1 + s /
+#' smax)`.
+#' @param quiet If `FALSE`, display progress info on screen
 #' @return Vector containing R-squared statistic and sum of squared errors for
 #' fitted mode (divided by 1e6)
 #' @export
