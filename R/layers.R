@@ -661,61 +661,6 @@ get_attractor_layer <- function (data_dir, v, type = "education")
 }
 
 
-#' all_ny_layers
-#'
-#' Calculate all flow layer of pedestrian densities for New York City, for a
-#' range of widths of exponential spatial interaction functions (`k`-values).
-#'
-#' @param net Weighted street network; loaded from `data_dir` if not provided
-#' @param k Vector of widths of exponential decay (in m) for spatial interaction
-#' models
-#' @param data_dir The directory in which data are to be, or have previously
-#' been, downloaded.
-#' @export
-all_ny_layers <- function (net = NULL, k = 2:9 * 100, data_dir)
-{
-    # NOTE: At the moment, these all use k_scale = 0
-    to <- c ("residential", "education", "entertainment", "healthcare",
-             "sustenance", "transportation", "disperse")
-    from <- rep ("subway", length (to))
-    to <- c ("subway", to)
-    from <- c ("residential", from)
-
-    # temporary reduction
-    to <- c ("education", "entertainment", "healthcare", "sustenance")
-    from <- rep ("subway", length (to))
-
-    my_arrow <- paste0 (cli::symbol$em_dash, cli::symbol$arrow_right)
-    t0 <- Sys.time ()
-    for (i in seq (from))
-    {
-        txt <- paste0 (from [i], " ", my_arrow, " ", to [i], " : ")
-        msg0 <- paste0 (cli::col_green (my_arrow), " ",
-                        cli::col_blue (txt))
-
-        for (j in k)
-        {
-            msg <- paste0 (msg0, " k = ", j, "m", collapse = "")
-            message (msg, appendLF = FALSE)
-            cat (stdout ()) # necessary to flush the buffer here - but why?
-            st0 <- Sys.time ()
-            x <- ny_layer (net, data_dir = data_dir, k = j, quiet = TRUE,
-                           from = from [i], to = to [i])
-            st <- formatC (as.numeric (difftime (Sys.time (), st0,
-                                                 units = "sec")),
-                           format = "f", digits = 1)
-            fname <- file.path (data_dir, "calibration",
-                                paste0 ("flow-",
-                                        substring (from [i], 1, 3), "-",
-                                        substring (to [i], 1, 3), "-k",
-                                        j, ".Rds"))
-            saveRDS (x, file = fname)
-            message ("\r", msg, "; done in ", st, "s")
-        }
-    }
-    message ("Total elapsed time = ", format_time_int (t0))
-}
-
 #' fit_one_layer
 #'
 #' Calculate fit for one layer with observed pedestrian counts, and return both
