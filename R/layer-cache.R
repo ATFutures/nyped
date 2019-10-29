@@ -176,6 +176,7 @@ get_attractor_layer <- function (data_dir, v, type = "education")
         index <- seq (nrow (a)) [which (!seq (nrow (a))) %in% index]
         if (length (index) > 0)
             a$capacity [index, ] <- 1
+        a$capacity [is.na (a$capacity)] <- 1
         a <- dplyr::select (a, c ("id", "capacity")) %>%
             dplyr::group_by (id) %>%
             dplyr::summarise (n = sum (capacity))
