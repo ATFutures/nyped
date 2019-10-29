@@ -1,6 +1,6 @@
 
 # ********************************************************************
-# ********************   FILE UTILITY FUNCTIONS   ********************   
+# ********************   FILE UTILITY FUNCTIONS   ********************
 # ********************************************************************
 
 get_header_txt <- function (from, to)
@@ -72,7 +72,8 @@ get_popdens_data <- function (v, data_dir)
         res <- readRDS (f)
     else
     {
-        nodes_new <- readRDS (file.path (data_dir, "worldpop", "pop-points.Rds"))
+        nodes_new <- readRDS (file.path (data_dir, "worldpop",
+                                         "pop-points.Rds"))
         layer_name <- names (nodes_new) [grep ("ppp_", names (nodes_new))]
         nodes_new$id <- v$id [dodgr::match_points_to_graph (v, nodes_new)]
         index <- which (!(nodes_new [[layer_name]] < dens_limit |
@@ -183,8 +184,10 @@ get_attractor_layer <- function (data_dir, v, type = "education")
     } else
     {
         if (type == "centrality")
+        {
             names (a) [which (names (a) == "centrality")] <- "n"
-        else
+            a <- a [which (is.finite (a$n)), ]
+        } else
         {
             if (type == "entertainment")
                 a <- a [a$amenity != "fountain", ]
