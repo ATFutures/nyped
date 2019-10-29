@@ -76,136 +76,113 @@ optim_layer1 <- function (net, from = "subway", to = "disperse", flowvars = NULL
 #' @inheritParams optim_layer1
 #' @export
 optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
-                          data_dir)
+                          flowvars = NULL, data_dir)
 {
     if (is.null (k))
         stop ("Initial value of 'k' must be provided, as returned from ",
               "'optim_layer1'")
+
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
     dp <- dodgr::dodgr_dists (net, from = p$id)
 
-    txt <- paste0 ("Optimising model fit from ", from, " to ", to)
+    txt <- paste0 ("Optimising 2-parameter model fit from ", from, " to ", to)
     message (cli::rule (center = txt, line = 2, col = "green"))
 
-    # initial k values 100:3000
-    message (cli::col_cyan (cli::symbol$star),
-             " Initial k values [100 -> 3000]")
-    ks <- 0.0
-    kvals <- 1:15 * 200
-    ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals,
-                      fitk = TRUE)
-    k <- k_old <- ss$kmin
-    message (cli::col_green (cli::symbol$star), " Initial k value = ", k)
-
-    # initial ks values -1:2
-    message (cli::col_cyan (cli::symbol$star), " Initial ks values [-1 -> 2]")
-    ksvals <- (-5:10) / 5
-    ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, ksvals,
-                      fitk = FALSE)
-    ks <- ks_old <- ss$kmin # -0.2
-    message (cli::col_green (cli::symbol$star), " Initial ks value = ", ks)
-
-    # second, slightly finer k-values
-    if (ks > 0)
+    loop1 <- function (net, from, to, d, dp, s, k, ks, data_dir, flowvars,
+                       kvals, ksvals, prfx)
     {
-        kvals <- 1:30 * 100
-        kvals <- kvals [kvals <= k]
-    } else
-        kvals <- k + -2:8 * 100
-    message (cli::col_cyan (cli::symbol$star), " Second k values [",
-             min (kvals), " -> ", max (kvals), "]")
-    kvals <- kvals [kvals > 0]
-    ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals,
-                      fitk = TRUE)
-    k_old <- k
-    k <- ss$kmin
-    message (cli::col_green (cli::symbol$star), " Second k value = ", k)
+        # Fit ks:
+        message (cli::col_cyan (cli::symbol$star), " ", prfx, " ks search [",
+                 paste (range (ksvals), collapse = " -> "), "]")
+        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars,
+                          data_dir, ksvals, fitk = FALSE)
+        ks_old <- ks
+        ks <- ss$kmin
+        message (cli::col_green (cli::symbol$star), " ", prfx,
+                 " ks value = ", ks)
 
-    # second ks-values
-    ksvals <- ks + (-5:5) / 10
-    message (cli::col_cyan (cli::symbol$star), " Second ks values [",
-             min (ksvals), " -> ", max (ksvals), "]")
-    ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, ksvals,
-                      fitk = FALSE)
+        # Then re-fit k:
+        k_old <- k
+        if (ks != ks_old)
+        {
+            kvals <- k + kvals
+            message (cli::col_cyan (cli::symbol$star), " ", prfx, " k search [",
+                     paste (range (kvals), collapse = " -> "), "]")
+            ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars,
+                              data_dir, kvals, fitk = TRUE)
+
+            niters2 <- 1
+            while (ss$kmin == min (ss$k))
+            {
+                kvals <- kvals - diff (range (kvals))
+                kvals <- kvals [kvals > 0]
+                message (cli::col_cyan (cli::symbol$star), " Loop (", niters,
+                         LETTERS [niters2], ") k search [",
+                         paste0 (range (kvals), collapse = " -> "), "]")
+                ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars,
+                                  data_dir, kvals, fitk = TRUE)
+                k <- ss$kmin
+                message (cli::col_green (cli::symbol$star), " Loop (", niters,
+                         LETTERS [niters2], ") k = ", k)
+                niters2 <- niters2 + 1
+                if (niters2 > 10)
+                    break
+            }
+            k <- ss$kmin
+            message (cli::col_green (cli::symbol$star), " ", prfx, " k value = ", k)
+        }
+
+        return (list (k = k, k_old = k_old, ks = ks, ks_old = ks_old, ss = ss))
+    }
+
+    # Initial loop:
+    ks <- 0
+    res <- loop1 (net, from, to, d, dp, s, k, ks, data_dir, flowvars,
+                  kvals = -2:8 * 100, ksvals = -5:10 / 5, "Initial")
+    k_old <- k
     ks_old <- ks
-    ks <- ss$kmin # -0.2
-    message (cli::col_green (cli::symbol$star), " Second ks value = ", ks)
+    k <- res$k
+    ks <- res$ks
 
-    # 3rd round of k-values
-    if (ks > 0)
-    {
-        kvals <- 1:30 * 100
-        kvals <- kvals [kvals <= k]
-    } else
-        kvals <- k + -2:8 * 100
-    kvals <- kvals [kvals > 0]
-    message (cli::col_cyan (cli::symbol$star), " Third k values [",
-             min (kvals), " -> ", max (kvals), "]")
-    ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir, kvals,
-                      fitk = TRUE)
-    k_old <- k
-    k <- ss$kmin
-    message (cli::col_green (cli::symbol$star), " Third k value = ", k)
-
-    #if (ks == ks_old) k_old <- k
-
-    # Then loop over both until convergence
     niters <- 1
     while (abs (k - k_old) > 0 & abs (ks - ks_old) > 0)
     {
+        kvals <- k + -5:5 * 10
+        ksvals <- ks + -5:5 / 10
+        res <- loop1 (net, from, to, do, dp, s, k, ks, data_dir, flowvars,
+                      kvals = kvals, ksvals = ksvals,
+                      paste0 ("Loop [", niters, "]"))
+        niters <- niters + 1
         k_old <- k
         ks_old <- ks
+        k <- res$k
+        ks <- res$ks
 
-        kvals <- k + (-5:5) * 10
-        kvals <- kvals [kvals > 0]
-        message (cli::col_cyan (cli::symbol$star), " Loop (", niters,
-                 ") k values [", min (kvals), " -> ", max (kvals), "]")
-        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir,
-                     kvals, fitk = TRUE)
-        if (stats::sd (ss$ss, na.rm = TRUE) > 0.1)
-            k <- ss$kmin
-        message (cli::col_green (cli::symbol$star), " Loop (", niters,
-                 ") k = ", k)
-
-        niters2 <- 1
-        while (k == min (ss$k))
-        {
-            kvals <- kvals - 100
-            kvals <- kvals [kvals > 0]
-            message (cli::col_cyan (cli::symbol$star), " Loop (", niters,
-                     LETTERS [niters2], ") k values [", min (kvals), " -> ",
-                     max (kvals), "]")
-            ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir,
-                         kvals, fitk = TRUE)
-            k <- ss$kmin
-            message (cli::col_green (cli::symbol$star), " Loop (", niters,
-                     LETTERS [niters2], ") k = ", k)
-            niters2 <- niters2 + 1
-            if (niters2 > 10)
-                break
-        }
-        if (stats::sd (ss$ss, na.rm = TRUE) > 0.1)
-            k <- ss$kmin # 200
-
-        ksvals <- ks + (-5:5) / 10
-        message (cli::col_cyan (cli::symbol$star), " Loop (", niters,
-                 ") ks values [", min (ksvals), " -> ", max (ksvals), "]")
-        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, data_dir,
-                     ksvals, fitk = FALSE)
-        if (stats::sd (ss$ss, na.rm = TRUE) > 0.1)
-            ks <- ss$kmin
-        message (cli::col_green (cli::symbol$star), " Loop (", niters,
-                 ") ks = ", ks)
-
-        niters <- niters + 1
         if (niters > 10)
+        {
+            message ("failed to converge after ", niters, " iterations")
             break
+        }
     }
-    message (cli::rule (center = "FINISHED", line = 2, col = "green"))
 
-    c (k = k, ks = ks)
+    star <- cli::symbol$star
+    label <- c (paste (star, from, " -> ", to, star),
+                paste ("k = ", k),
+                paste ("ks = ", ks),
+                paste (expression (R^2), " = ", signif (res$ss$r2, 3)))
+    message (cli::boxx (
+                        cli::col_white (label),
+                        border_style="round",
+                        padding = 1,
+                        float = "center",
+                        border_col = "tomato3",
+                        background_col = "deepskyblue"
+                        ))
+    message (cli::rule (center = "FINISHED", line = 2, col = "green"), "\n")
+
+    c (k = k, ks = ks, r2 = res$ss$r2)
 }
 
 fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
