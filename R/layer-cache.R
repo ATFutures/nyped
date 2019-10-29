@@ -150,7 +150,13 @@ get_attractor_layer <- function (data_dir, v, type = "education")
     # points beyond get aggregated to nearest points, producing anomalously huge
     # values at boundaries.)
     pts <- sf::st_as_sf (a, coords = c ("x", "y"), crs = 4326)
-    bb <- osmdata::getbb ("new york city", format_out = "sf_polygon")
+    f <- file.path (tempdir (), "nyc-bb.Rds")
+    if (!file.exists (f))
+    {
+        bb <- osmdata::getbb ("new york city", format_out = "sf_polygon")
+        saveRDS (bb, file = f)
+    } else
+        bb <- readRDS (f)
     suppressMessages (index <- sf::st_contains (bb, pts) [[1]])
     a <- a [index, ]
     # a for ny-attractors has OSM id's, but these need to be re-matched to

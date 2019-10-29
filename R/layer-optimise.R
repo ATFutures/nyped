@@ -45,13 +45,13 @@ optim_layer1 <- function (net, from = "subway", to = "disperse", flowvars = NULL
                           kvals, fitk = TRUE, cache = cache)
         k <- ss$kmin
         message (cli::col_green (cli::symbol$star), " ", prfx [i],
-                 " k value = ", k, "; r2 = ", signif (ss$r2, 3))
+                 " k value = ", k, "; r2 = ", signif (ss$r2, 4))
     }
 
     star <- cli::symbol$star
     label <- c (paste (star, from, " -> ", to, star),
                 paste ("k = ", ss$kmin),
-                paste (expression (R^2), " = ", signif (ss$r2, 3)))
+                paste (expression (R^2), " = ", signif (ss$r2, 4)))
     message (cli::boxx (
                         cli::col_white (label),
                         border_style="round",
