@@ -251,7 +251,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
     close (pb)
 
     if (any (is.na (ss))) # if SS progressively increases with first k-values
-        return (list (k = x, ss = ss, kmin = x [1]))
+        return (list (k = x, ss = ss, kmin = x [1], r2 = r2 [1]))
 
     mod <- stats::loess (ss ~ x, span = lspan)
     fit <- stats::predict (mod, newdata = data.frame (x2 = x))
