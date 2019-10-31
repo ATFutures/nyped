@@ -20,8 +20,8 @@
 #' @param cache If `TRUE`, layers are cached in a sub-directory of `data_dir`
 #' for later reloading.
 #' @export
-optim_layer1 <- function (net, from = "subway", to = "disperse", flowvars = NULL,
-                          data_dir, cache = TRUE)
+optim_layer1 <- function (net, from = "subway", to = "disperse",
+                          flowvars = NULL, data_dir, cache = TRUE)
 {
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
@@ -39,7 +39,8 @@ optim_layer1 <- function (net, from = "subway", to = "disperse", flowvars = NULL
     {
         kvals <- k + kscale [[i]]
         kvals <- kvals [which (kvals > 0)]
-        message (cli::col_cyan (cli::symbol$star), " ", prfx [i], " k values [", 
+        message (cli::col_cyan (cli::symbol$star), " ", prfx [i],
+                 " k values [",
                  paste0 (range (kvals), collapse = " -> "), "]")
         ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
                           kvals, fitk = TRUE, cache = cache)
@@ -54,7 +55,7 @@ optim_layer1 <- function (net, from = "subway", to = "disperse", flowvars = NULL
                 paste (expression (R^2), " = ", signif (ss$r2, 4)))
     message (cli::boxx (
                         cli::col_white (label),
-                        border_style="round",
+                        border_style = "round",
                         padding = 1,
                         float = "center",
                         border_col = "tomato3",
@@ -131,7 +132,8 @@ optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
                     break
             }
             k <- ss$kmin
-            message (cli::col_green (cli::symbol$star), " ", prfx, " k value = ", k)
+            message (cli::col_green (cli::symbol$star), " ", prfx,
+                     " k value = ", k)
         }
 
         return (list (k = k, k_old = k_old, ks = ks, ks_old = ks_old, ss = ss))
@@ -174,7 +176,7 @@ optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
                 paste (expression (R^2), " = ", signif (res$ss$r2, 3)))
     message (cli::boxx (
                         cli::col_white (label),
-                        border_style="round",
+                        border_style = "round",
                         padding = 1,
                         float = "center",
                         border_col = "tomato3",
@@ -217,8 +219,9 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
     if (to == "disperse")
     {
         for (i in seq (x)) {
-            temp <- disperse_one_layer (net, from, fr_dat, ki [i], ksi [i], p, dp,
-                                        flowvars, data_dir, cache = cache)
+            temp <- disperse_one_layer (net, from, fr_dat, ki [i], ksi [i],
+                                        p, dp, flowvars,
+                                        data_dir, cache = cache)
             r2 [i] <- temp$stats [3]
             ss [i] <- temp$stats [4]
             utils::setTxtProgressBar (pb, i / length (x))
@@ -234,12 +237,9 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
         else
             to_dat <- get_attractor_layer (data_dir, v, type = to)
 
-        dmat <- dodgr::dodgr_distances (net, from = fr_dat$id, to = to_dat$id)
-        dmat [is.na (dmat)] <- max (dmat, na.rm = TRUE)
-
         for (i in seq (x)) {
             temp <- aggregate_one_layer (net, from, to, fr_dat, to_dat,
-                                         ki [i], ksi [i], p, dp, dmat,
+                                         ki [i], ksi [i], p, dp,
                                          flowvars, data_dir, cache = cache)
             r2 [i] <- temp$stats [3]
             ss [i] <- temp$stats [4]
@@ -321,11 +321,8 @@ calc_layer <- function (net, from = "subway", to = "disperse", k, k_scale, data_
         else
             to_dat <- get_attractor_layer (data_dir, v, type = to)
 
-        dmat <- dodgr::dodgr_distances (net, from = fr_dat$id, to = to_dat$id)
-        dmat [is.na (dmat)] <- max (dmat, na.rm = TRUE)
-
         temp <- aggregate_one_layer (net, from, to, fr_dat, to_dat,
-                                     k, k_scale, p, dp, dmat,
+                                     k, k_scale, p, dp,
                                      flowvars = NULL, data_dir, cache = TRUE)
     }
 
@@ -410,7 +407,7 @@ disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, flowvars,
 }
 
 aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
-                                 dmat, flowvars, data_dir, cache = TRUE)
+                                 flowvars, data_dir, cache = TRUE)
 {
     f <- get_file_name (data_dir, from, to, k, ks)
     if (file.exists (f) & cache)
@@ -418,35 +415,13 @@ aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
         net_f <- readRDS (f)
     } else
     {
-        nfr <- nrow (fr_dat)
-        nto <- nrow (to_dat)
-
         kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
-        kmat <- matrix (kvals, nrow = nfr, ncol = nto)
 
-        frmat <- matrix (fr_dat$n, nrow = nfr, ncol = nto)
+        net_f <- dodgr::dodgr_flows_si (net, from = fr_dat$id,
+                                        to = to_dat$id, k = kvals,
+                                        dens_from = fr_dat$n,
+                                        dens_to = to_dat$n)
 
-        emat <- frmat * exp (-dmat / kmat)
-        # the first constraint, to unit sums over all destinations (columns)
-        # from each origin (row)
-        cmat <- t (matrix (colSums (emat), nrow = nto, ncol = nfr))
-        emat <- emat / cmat
-        # the second constraint, so each origin (row) allocates fr$n to all
-        # destinations (columns)
-        fmat <- frmat * emat / nto
-
-        net_f <- NULL
-        while (is.null (net_f))
-        {
-            # aggregation sometimes errors in parallel aggregation
-            net_f <- tryCatch ({
-                dodgr::dodgr_flows_aggregate (net, from = fr_dat$id,
-                                              to = to_dat$id, flows = fmat) },
-                error = function (e) { NULL },
-                warning = function (w) { NULL })
-        }
-        #net_f <- dodgr::dodgr_flows_aggregate (net, from = fr_dat$id,
-        #                                       to = to_dat$id, flows = fmat)
         if (cache)
             cache_layer (net_f, data_dir, from, to, k, ks)
     }
