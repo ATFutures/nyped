@@ -242,8 +242,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
             to_dat <- get_attractor_layer (data_dir, v, type = to)
 
         temp <- aggregate_one_layer (net, from, to, fr_dat, to_dat,
-                                     ki, ksi, p, dp, flowvars,
-                                     data_dir, cache = cache)
+                                     ki, ksi, p, dp, flowvars, data_dir)
         ss <- temp$ss
         i <- which.min (ss)
         r2 <- temp$stats [which (names (temp$stats) == "r2")]
@@ -293,7 +292,7 @@ calc_layer <- function (net, from = "subway", to = "disperse", k, k_scale, data_
 
         temp <- aggregate_one_layer (net, from, to, fr_dat, to_dat,
                                      k, k_scale, p, dp,
-                                     flowvars = NULL, data_dir, cache = TRUE)
+                                     flowvars = NULL, data_dir)
     }
 
     return (temp)
