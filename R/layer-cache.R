@@ -118,7 +118,7 @@ flow_to_ped_pts <- function (net_f, p, dp, get_nearest = TRUE)
         # only NA values, so second approach is implemented
         i1 <- which (net_f$.vx0 == p$id [i])
         i2 <- which (net_f$.vx1 == p$id [i])
-        for (j in seq (fcols))
+        for (j in seq_along (fcols))
         {
             flows [i, j] <- sum (net_f [i1, fcols [j]], na.rm = TRUE) +
                 sum (net_f [i2, fcols [j]], na.rm = TRUE)
@@ -129,10 +129,10 @@ flow_to_ped_pts <- function (net_f, p, dp, get_nearest = TRUE)
             {
                 di <- dp [i, ] [order (dp [i, ])]
                 f_ord <- net_f [match (net_f$.vx0, names (di)), fcols [j]]
-                flow0 <- f_ord [which (f_ord > 0)] [1]
+                flow0 <- f_ord [which (f_ord [, 1] > 0), 1] [1, 1]
                 f_ord <- net_f [match (net_f$.vx1, names (di)), fcols [j]]
-                flow1 <- f_ord [which (f_ord > 0)] [1]
-                flows [i, j] <- flow0 + flow1
+                flow1 <- f_ord [which (f_ord [, 1] > 0), 1] [1, 1]
+                flows [i, j] <- as.numeric (flow0 + flow1)
             }
         } # end for j over flow columns
     } # end for i
