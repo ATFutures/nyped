@@ -244,8 +244,27 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
         temp <- aggregate_one_layer (net, from, to, fr_dat, to_dat,
                                      ki, ksi, p, dp, flowvars, data_dir)
         ss <- temp$ss
-        i <- which.min (ss)
-        r2 <- temp$stats [which (names (temp$stats) == "r2")]
+        #i <- which.min (ss)
+        #r2 <- temp$stats [which (names (temp$stats) == "r2")]
+
+        mod <- stats::loess (ss ~ x, span = lspan)
+        fit <- stats::predict (mod)
+        sdlim <- 2 * stats::sd (mod$residuals)
+        n <- length (which (abs (mod$residuals) > sdlim))
+        if (n > 0 & n < 3 & length (x) > 6) # remove extreme values
+        {
+            index <- which (abs (mod$residuals) <= sdlim)
+            x2 <- x [index]
+            y <- ss [index]
+            mod2 <- tryCatch ({
+                stats::loess (y ~ x2, span = lspan)},
+                warning = function (w) { NULL },
+                error = function (e) { NULL })
+            if (!is.null (mod2))
+                fit <- stats::predict (mod2, newdata = data.frame (x2 = x))
+        }
+        i <- which.min (fit)
+        r2 = temp$r2 [i]
     }
 
 
@@ -395,8 +414,16 @@ aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
         mod <- summary (stats::lm (p$week ~ flowvars_i))
         sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6
     }
+    getr2 <- function (p, flowvars, flows, i)
+    {
+        flowvars_i <- cbind (flowvars, flows [, i])
+        mod <- summary (stats::lm (p$week ~ flowvars_i))
+        mod$r.squared
+    }
     ss <- vapply (seq (ncol (flows)), function (i)
                   getss (p, flowvars, flows, i), numeric (1))
+    r2 <- vapply (seq (ncol (flows)), function (i)
+                  getr2 (p, flowvars, flows, i), numeric (1))
     imin <- which.min (ss)
     flowvars_i <- cbind (flowvars, flows [, imin])
     mod <- summary (stats::lm (p$week ~ flowvars_i))
@@ -404,9 +431,10 @@ aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
     p$flow <- flows [, imin]
 
     list (ss = ss,
+          r2 = r2,
           stats = c (k = k [imin],
                      k_scale = ks [imin],
-                     r2 = mod$adj.r.squared,
+                     r2 = r2 [imin],
                      ss = sum (mod$residuals ^ 2) /
                          length (mod$residuals) / 1e6),
           p = p)

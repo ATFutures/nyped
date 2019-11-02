@@ -128,10 +128,12 @@ flow_to_ped_pts <- function (net_f, p, dp, get_nearest = TRUE)
             if (flows [i, j] == 0 & get_nearest)
             {
                 di <- dp [i, ] [order (dp [i, ])]
-                f_ord <- net_f [match (net_f$.vx0, names (di)), fcols [j]]
-                flow0 <- f_ord [which (f_ord [, 1] > 0), 1] [1, 1]
-                f_ord <- net_f [match (net_f$.vx1, names (di)), fcols [j]]
-                flow1 <- f_ord [which (f_ord [, 1] > 0), 1] [1, 1]
+                f_ord <- net_f [match (net_f$.vx0, names (di)), fcols [j],
+                                drop = FALSE]
+                flow0 <- f_ord [which (f_ord [, 1] > 0), 1, drop = FALSE] [1, 1]
+                f_ord <- net_f [match (net_f$.vx1, names (di)), fcols [j],
+                                drop = FALSE]
+                flow1 <- f_ord [which (f_ord [, 1] > 0), 1, drop = FALSE] [1, 1]
                 flows [i, j] <- as.numeric (flow0 + flow1)
             }
         } # end for j over flow columns
