@@ -246,7 +246,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
                                      data_dir, cache = cache)
         ss <- temp$ss
         i <- which.min (ss)
-        r2 <- temp$r2
+        r2 <- temp$stats [which (names (temp$stats) == "r2")]
     }
 
 
@@ -377,27 +377,18 @@ disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, flowvars,
 }
 
 aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
-                                 flowvars, data_dir, cache = TRUE)
+                                 flowvars, data_dir)
 {
-    f <- get_file_name (data_dir, from, to, k, ks)
-    if (file.exists (f) & cache)
-    {
-        net_f <- readRDS (f)
-    } else
-    {
-        nvals <- rep (fr_dat$n, length (k))
-        kvals <- k ^ (1 + ks * nvals / max (nvals))
-        #kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
+    nvals <- rep (fr_dat$n, length (k))
+    kvals <- k ^ (1 + ks * nvals / max (nvals))
 
-        net_f <- dodgr::dodgr_flows_si (net, from = fr_dat$id,
-                                        to = to_dat$id, k = kvals,
-                                        dens_from = fr_dat$n,
-                                        dens_to = to_dat$n)
+    net_f <- dodgr::dodgr_flows_si (net, from = fr_dat$id,
+                                    to = to_dat$id, k = kvals,
+                                    dens_from = fr_dat$n,
+                                    dens_to = to_dat$n)
 
-        if (cache)
-            cache_layer (net_f, data_dir, from, to, k, ks)
-    }
     flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
+
     # find which (k, ks) pair gives minimal error
     getss <- function (p, flowvars, flows, i)
     {

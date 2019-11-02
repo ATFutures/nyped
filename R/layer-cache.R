@@ -105,6 +105,8 @@ d_subway_res <- function (net, s, nodes_new, data_dir)
 # *********************   MISC EXTRA FUNCTIONS   *********************
 # ********************************************************************
 
+# This function now takes a *REALLY* long time - like 1 minute or so - with
+# several flow columns -> TODO: shuck off to C++-land
 flow_to_ped_pts <- function (net_f, p, dp, get_nearest = TRUE)
 {
     fcols <- grep ("flow", names (net_f))
