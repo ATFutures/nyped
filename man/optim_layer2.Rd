@@ -5,7 +5,7 @@
 \title{optim_layer2}
 \usage{
 optim_layer2(net, from = "subway", to = "disperse", k = NULL,
-  data_dir)
+  flowvars = NULL, data_dir)
 }
 \arguments{
 \item{net}{Weighted street network; loaded from `data_dir` if not provided}
@@ -18,6 +18,11 @@ optim_layer2(net, from = "subway", to = "disperse", k = NULL,
 "transportation", or "disperse" for a general dispersal model.}
 
 \item{k}{Width of exponential decay (in m) for spatial interaction models}
+
+\item{flowvars}{A `data.frame` of flows from previously calculated layers. If
+provided, these are included in the model, and the target layer is optimised
+as part of a multiple linear regression which includes these variables. Must
+have same number of rows as `net`.}
 
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
