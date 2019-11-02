@@ -107,7 +107,8 @@ d_subway_res <- function (net, s, nodes_new, data_dir)
 
 flow_to_ped_pts <- function (net_f, p, dp, get_nearest = TRUE)
 {
-    flows <- rep (NA, nrow (p))
+    fcols <- grep ("flow", names (net_f))
+    flows <- array (NA, dim = c (nrow (p), length (fcols)))
 
     for (i in seq (nrow (p)))
     {
@@ -115,21 +116,24 @@ flow_to_ped_pts <- function (net_f, p, dp, get_nearest = TRUE)
         # only NA values, so second approach is implemented
         i1 <- which (net_f$.vx0 == p$id [i])
         i2 <- which (net_f$.vx1 == p$id [i])
-        flows [i] <- sum (net_f$flow [i1], na.rm = TRUE) +
-            sum (net_f$flow [i2], na.rm = TRUE)
-
-        # OR: choose first edges near that observation vertex that have non-zero
-        # flows
-        if (flows [i] == 0 & get_nearest)
+        for (j in seq (fcols))
         {
-            di <- dp [i, ] [order (dp [i, ])]
-            f_ord <- net_f$flow [match (net_f$.vx0, names (di))]
-            flow0 <- f_ord [which (f_ord > 0)] [1]
-            f_ord <- net_f$flow [match (net_f$.vx1, names (di))]
-            flow1 <- f_ord [which (f_ord > 0)] [1]
-            flows [i] <- flow0 + flow1
-        }
-    }
+            flows [i, j] <- sum (net_f [i1, fcols [j]], na.rm = TRUE) +
+                sum (net_f [i2, fcols [j]], na.rm = TRUE)
+
+            # OR: choose first edges near that observation vertex that have non-zero
+            # flows
+            if (flows [i, j] == 0 & get_nearest)
+            {
+                di <- dp [i, ] [order (dp [i, ])]
+                f_ord <- net_f [match (net_f$.vx0, names (di)), fcols [j]]
+                flow0 <- f_ord [which (f_ord > 0)] [1]
+                f_ord <- net_f [match (net_f$.vx1, names (di)), fcols [j]]
+                flow1 <- f_ord [which (f_ord > 0)] [1]
+                flows [i, j] <- flow0 + flow1
+            }
+        } # end for j over flow columns
+    } # end for i
 
     return (flows)
 }
@@ -187,6 +191,7 @@ get_attractor_layer <- function (data_dir, v, type = "education")
         {
             names (a) [which (names (a) == "centrality")] <- "n"
             a <- a [which (is.finite (a$n)), ]
+            a$n <- a$n / max (a$n)
         } else
         {
             if (type == "entertainment")

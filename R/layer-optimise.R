@@ -213,11 +213,11 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
     else
         fr_dat <- get_attractor_layer (data_dir, v, type = from)
 
-    ss <- r2 <- rep (NA, length (x))
-    i <- NULL # suppress no visible binding note
-    pb <- utils::txtProgressBar (style = 3)
     if (to == "disperse")
     {
+        ss <- r2 <- rep (NA, length (x))
+        i <- NULL # suppress no visible binding note
+        pb <- utils::txtProgressBar (style = 3)
         for (i in seq (x)) {
             temp <- disperse_one_layer (net, from, fr_dat, ki [i], ksi [i],
                                         p, dp, flowvars,
@@ -228,6 +228,10 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
             if (i > 2 & all (diff (ss [!is.na (ss)]) > 0))
                 break # lowest SS is first k
         }
+        close (pb)
+
+        i <- which.min (ss)
+        r2 <- r2 [i]
     } else
     {
         if (to == "residential")
@@ -237,50 +241,16 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
         else
             to_dat <- get_attractor_layer (data_dir, v, type = to)
 
-        for (i in seq (x)) {
-            temp <- aggregate_one_layer (net, from, to, fr_dat, to_dat,
-                                         ki [i], ksi [i], p, dp,
-                                         flowvars, data_dir, cache = cache)
-            r2 [i] <- temp$stats [3]
-            ss [i] <- temp$stats [4]
-            utils::setTxtProgressBar (pb, i / length (x))
-            if (i > 2 & all (diff (ss [!is.na (ss)]) > 0))
-                break # lowest SS is first k
-        }
+        temp <- aggregate_one_layer (net, from, to, fr_dat, to_dat,
+                                     ki, ksi, p, dp, flowvars,
+                                     data_dir, cache = cache)
+        ss <- temp$ss
+        i <- which.min (ss)
+        r2 <- temp$r2
     }
-    close (pb)
 
-    if (any (is.na (ss))) # if SS progressively increases with first k-values
-        return (list (k = x, ss = ss, kmin = x [1], r2 = r2 [1]))
 
-    mod <- stats::loess (ss ~ x, span = lspan)
-    fit <- stats::predict (mod, newdata = data.frame (x2 = x))
-    if (plot)
-    {
-        plot (x, ss, pch = 2, col = "orange")
-        graphics::lines (x, fit, col = "red", lwd = 2)
-    }
-    sdlim <- 2 * stats::sd (mod$residuals)
-    n <- length (which (abs (mod$residuals) > sdlim))
-    if (n > 0 & n < 3 & length (x) > 6) # remove extreme values
-    {
-        index <- which (abs (mod$residuals) <= sdlim)
-        x2 <- x [index]
-        y <- ss [index]
-        mod2 <- tryCatch ({
-            stats::loess (y ~ x2, span = lspan)},
-            warning = function (w) { NULL },
-            error = function (e) { NULL })
-        if (!is.null (mod2))
-            fit <- stats::predict (mod2, newdata = data.frame (x2 = x))
-        if (plot)
-            graphics::lines (x, fit, col = "red", lwd = 2, lty = 2)
-    }
-    i <- which.min (fit)
-    if (plot)
-        graphics::points (x [i], ss [i], pch = 19, col = "red", cex = 2)
-
-    return (list (k = x, ss = ss, kmin = x [i], r2 = r2 [i]))
+    return (list (k = x, ss = ss, kmin = x [i], r2 = r2))
 }
 
 #' calc_layer
@@ -415,7 +385,9 @@ aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
         net_f <- readRDS (f)
     } else
     {
-        kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
+        nvals <- rep (fr_dat$n, length (k))
+        kvals <- k ^ (1 + ks * nvals / max (nvals))
+        #kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
 
         net_f <- dodgr::dodgr_flows_si (net, from = fr_dat$id,
                                         to = to_dat$id, k = kvals,
@@ -426,12 +398,24 @@ aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
             cache_layer (net_f, data_dir, from, to, k, ks)
     }
     flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
-    flowvars <- cbind (flowvars, flows)
-    p$flow <- flows
+    # find which (k, ks) pair gives minimal error
+    getss <- function (p, flowvars, flows, i)
+    {
+        flowvars_i <- cbind (flowvars, flows [, i])
+        mod <- summary (stats::lm (p$week ~ flowvars_i))
+        sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6
+    }
+    ss <- vapply (seq (ncol (flows)), function (i)
+                  getss (p, flowvars, flows, i), numeric (1))
+    imin <- which.min (ss)
+    flowvars_i <- cbind (flowvars, flows [, imin])
+    mod <- summary (stats::lm (p$week ~ flowvars_i))
 
-    mod <- summary (stats::lm (p$week ~ flowvars))
-    list (stats = c (k = k,
-                     k_scale = ks,
+    p$flow <- flows [, imin]
+
+    list (ss = ss,
+          stats = c (k = k [imin],
+                     k_scale = ks [imin],
                      r2 = mod$adj.r.squared,
                      ss = sum (mod$residuals ^ 2) /
                          length (mod$residuals) / 1e6),
