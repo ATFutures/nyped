@@ -244,8 +244,6 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
         temp <- aggregate_one_layer (net, from, to, fr_dat, to_dat,
                                      ki, ksi, p, dp, flowvars, data_dir)
         ss <- temp$ss
-        #i <- which.min (ss)
-        #r2 <- temp$stats [which (names (temp$stats) == "r2")]
 
         mod <- stats::loess (ss ~ x, span = lspan)
         fit <- stats::predict (mod)
