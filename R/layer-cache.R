@@ -105,39 +105,40 @@ d_subway_res <- function (net, s, nodes_new, data_dir)
 # *********************   MISC EXTRA FUNCTIONS   *********************
 # ********************************************************************
 
-# This function now takes a *REALLY* long time - like 1 minute or so - with
-# several flow columns -> TODO: shuck off to C++-land
 flow_to_ped_pts <- function (net_f, p, dp, get_nearest = TRUE)
 {
     fcols <- grep ("flow", names (net_f))
     flows <- array (NA, dim = c (nrow (p), length (fcols)))
 
+    # Instead of finding  edges that flow in and out of that point, this
+    # function chooses the first edges near each observation vertex that has
+    # non-zero flows
+
+    index0 <- vapply (seq (nrow (p)), function (i)
+                      {
+                          o <- colnames (dp) [order (dp [i, ])]
+                          match (o, net_f$.vx0)
+                      }, integer (ncol (dp)))
+    # index0 holds direct indices into net_f, with each column ordered by
+    # increasing distance from pedestrian point to $.vx0
+    index1 <- vapply (seq (nrow (p)), function (i)
+                      {
+                          o <- colnames (dp) [order (dp [i, ])]
+                          match (o, net_f$.vx1)
+                      }, integer (ncol (dp)))
+
     for (i in seq (nrow (p)))
     {
-        # find edges that flow in and out of that point - these commonly return
-        # only NA values, so second approach is implemented
-        i1 <- which (net_f$.vx0 == p$id [i])
-        i2 <- which (net_f$.vx1 == p$id [i])
         for (j in seq_along (fcols))
         {
-            flows [i, j] <- sum (net_f [i1, fcols [j]], na.rm = TRUE) +
-                sum (net_f [i2, fcols [j]], na.rm = TRUE)
-
-            # OR: choose first edges near that observation vertex that have non-zero
-            # flows
-            if (flows [i, j] == 0 & get_nearest)
-            {
-                di <- dp [i, ] [order (dp [i, ])]
-                f_ord <- net_f [match (net_f$.vx0, names (di)), fcols [j],
-                                drop = FALSE]
-                flow0 <- f_ord [which (f_ord [, 1] > 0), 1, drop = FALSE] [1, 1]
-                f_ord <- net_f [match (net_f$.vx1, names (di)), fcols [j],
-                                drop = FALSE]
-                flow1 <- f_ord [which (f_ord [, 1] > 0), 1, drop = FALSE] [1, 1]
-                flows [i, j] <- as.numeric (flow0 + flow1)
-            }
-        } # end for j over flow columns
-    } # end for i
+            flow0 <- net_f [index0 [, i], fcols [j]]
+            flow0 <- flow0 [which (flow0 > 0)] [1]
+            flow1 <- net_f [index1 [, i], fcols [j]]
+            flow1 <- flow1 [which (flow1 > 0)] [1]
+            flow0 + flow1
+            flows [i, j] <- flow0 + flow1
+        }
+    }
 
     return (flows)
 }
