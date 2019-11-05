@@ -72,7 +72,7 @@ optim_layer1 <- function (net, from = "subway", to = "disperse",
 
     star <- cli::symbol$star
     label <- c (paste (star, from, " -> ", to, star),
-                paste ("k = ", ss$kmin),
+                paste ("k = ", ss$k),
                 paste (expression (R^2), " = ", signif (ss$r2, 4)))
     message (cli::boxx (
                         cli::col_white (label),
