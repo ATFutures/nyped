@@ -29,46 +29,52 @@ optim_layer1 <- function (net, from = "subway", to = "disperse",
     txt <- paste0 ("Optimising model fit from ", from, " to ", to)
     message (cli::rule (center = txt, line = 2, col = "green"))
 
-    k_scale <- list (1:30 * 100, -20:20 * 10)
+    #k_scale <- list (1:30 * 100, -20:20 * 10)
+    #ks <- 0.0
+    #k <- 0
+    #k_old <- 9999
+    #niters <- 1
+    #index <- 1 # index in to k/ks_scale
+    #while (k_old != k)
+    #{
+    #    k_old <- k
+
+    #    kvals <- k + k_scale [[index]]
+    #    kvals <- kvals [which (kvals > 0)]
+    #    message (cli::col_cyan (cli::symbol$star), " Iteration#", niters,
+    #             " : k values [",
+    #             paste0 (range (kvals), collapse = " -> "), "]")
+    #    ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
+                          kvals, fitk = TRUE)
+    #    k <- ss$k
+    #    message (cli::col_green (cli::symbol$star), " Iteration#", niters,
+    #             " : k value = ", k, "; r2 = ", signif (ss$r2, 4))
+
+    #    niters2 <- 1
+    #    while (k == min (kvals))
+    #    {
+    #        kvals <- kvals - diff (range (kvals))
+    #        message (cli::col_cyan (cli::symbol$star), " Iteration#", niters,
+    #                 " - Loop (", niters2, LETTERS [niters2], ") k search [",
+    #                 paste0 (range (kvals), collapse = " -> "), "]")
+    #        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars,
+    #                          data_dir, kvals, fitk = TRUE)
+    #        k <- ss$k
+    #        message (cli::col_green (cli::symbol$star), " Iteration#", niters,
+    #                 " - Loop (", niters2, LETTERS [niters2], ") k = ", k)
+    #        niters2 <- niters2 + 1
+    #        if (niters2 > 10)
+    #            break
+    #    }
+
+    #    index <- 2
+    #}
+    kvals <- 1:30 * 100
     ks <- 0.0
     k <- 0
-    k_old <- 9999
-    niters <- 1
-    index <- 1 # index in to k/ks_scale
-    while (k_old != k)
-    {
-        k_old <- k
-
-        kvals <- k + k_scale [[index]]
-        kvals <- kvals [which (kvals > 0)]
-        message (cli::col_cyan (cli::symbol$star), " Iteration#", niters,
-                 " : k values [",
-                 paste0 (range (kvals), collapse = " -> "), "]")
-        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
-                          kvals, fitk = TRUE)
-        k <- ss$k
-        message (cli::col_green (cli::symbol$star), " Iteration#", niters,
-                 " : k value = ", k, "; r2 = ", signif (ss$r2, 4))
-
-        niters2 <- 1
-        while (k == min (kvals))
-        {
-            kvals <- kvals - diff (range (kvals))
-            message (cli::col_cyan (cli::symbol$star), " Iteration#", niters,
-                     " - Loop (", niters2, LETTERS [niters2], ") k search [",
-                     paste0 (range (kvals), collapse = " -> "), "]")
-            ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars,
-                              data_dir, kvals, fitk = TRUE)
-            k <- ss$k
-            message (cli::col_green (cli::symbol$star), " Iteration#", niters,
-                     " - Loop (", niters2, LETTERS [niters2], ") k = ", k)
-            niters2 <- niters2 + 1
-            if (niters2 > 10)
-                break
-        }
-
-        index <- 2
-    }
+    ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
+                      kvals, fitk = TRUE)
+    k <- ss$k
 
     star <- cli::symbol$star
     label <- c (paste (star, from, " -> ", to, star),
