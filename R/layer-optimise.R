@@ -45,7 +45,7 @@ optim_layer1 <- function (net, from = "subway", to = "disperse",
     #             " : k values [",
     #             paste0 (range (kvals), collapse = " -> "), "]")
     #    ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
-                          kvals, fitk = TRUE)
+    #                      kvals, fitk = TRUE)
     #    k <- ss$k
     #    message (cli::col_green (cli::symbol$star), " Iteration#", niters,
     #             " : k value = ", k, "; r2 = ", signif (ss$r2, 4))
