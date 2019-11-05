@@ -29,22 +29,45 @@ optim_layer1 <- function (net, from = "subway", to = "disperse",
     txt <- paste0 ("Optimising model fit from ", from, " to ", to)
     message (cli::rule (center = txt, line = 2, col = "green"))
 
-    kscale <- list (1:30 * 100, -5:5 * 100, -5:5 * 20, -5:5 * 10)
-    prfx <- c ("Initial", "Second", "Third", "Final")
+    k_scale <- list (1:30 * 100, -20:20 * 10)
     ks <- 0.0
     k <- 0
-    for (i in seq (kscale))
+    k_old <- 9999
+    niters <- 1
+    index <- 1 # index in to k/ks_scale
+    while (k_old != k)
     {
-        kvals <- k + kscale [[i]]
+        k_old <- k
+
+        kvals <- k + k_scale [[index]]
         kvals <- kvals [which (kvals > 0)]
-        message (cli::col_cyan (cli::symbol$star), " ", prfx [i],
-                 " k values [",
+        message (cli::col_cyan (cli::symbol$star), " Iteration#", niters,
+                 " : k values [",
                  paste0 (range (kvals), collapse = " -> "), "]")
         ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
                           kvals, fitk = TRUE)
-        k <- ss$kmin
-        message (cli::col_green (cli::symbol$star), " ", prfx [i],
-                 " k value = ", k, "; r2 = ", signif (ss$r2, 4))
+        k <- ss$k
+        message (cli::col_green (cli::symbol$star), " Iteration#", niters,
+                 " : k value = ", k, "; r2 = ", signif (ss$r2, 4))
+
+        niters2 <- 1
+        while (k == min (kvals))
+        {
+            kvals <- kvals - diff (range (kvals))
+            message (cli::col_cyan (cli::symbol$star), " Iteration#", niters,
+                     " - Loop (", niters2, LETTERS [niters2], ") k search [",
+                     paste0 (range (kvals), collapse = " -> "), "]")
+            ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars,
+                              data_dir, kvals, fitk = TRUE)
+            k <- ss$k
+            message (cli::col_green (cli::symbol$star), " Iteration#", niters,
+                     " - Loop (", niters2, LETTERS [niters2], ") k = ", k)
+            niters2 <- niters2 + 1
+            if (niters2 > 10)
+                break
+        }
+
+        index <- 2
     }
 
     star <- cli::symbol$star
@@ -61,117 +84,105 @@ optim_layer1 <- function (net, from = "subway", to = "disperse",
                         ))
     message (cli::rule (center = "FINISHED", line = 2, col = "green"), "\n")
 
-    return (ss [3:4]) # (k, r2)
+    ss$stats <- NULL
+    return (ss)
 }
 
 #' optim_layer2
 #'
-#' Optimise `k` and `k_scale` parameters to optimally fit flow layer to observed
-#' pedestrian densities. Note that optimisation can't be implemented directly
-#' because results are too noisy, so a series of custom ranges is scanned, and
-#' optimal values found from loess fits.
+#' Optimise flow layer to observed pedestrian densities according to single `k`
+#' parameter. Note that optimisation can't be implemented directly because
+#' results are too noisy, so a series of custom ranges is scanned, and optimal
+#' values found from loess fits.
 #'
-#' @param k Width of exponential decay (in m) for spatial interaction models
-#' @inheritParams optim_layer1
+#' @param net Weighted street network; loaded from `data_dir` if not provided
+#' @param from Category of origins for pedestrian flows; one of "subway" or
+#' "residential"
+#' @param to Category of destinations for pedestrian flows; one of
+#' "residential", "education", "entertainment", "healthcare", "sustenance",
+#' "transportation", or "disperse" for a general dispersal model.
+#' @param flowvars A `data.frame` of flows from previously calculated layers. If
+#' provided, these are included in the model, and the target layer is optimised
+#' as part of a multiple linear regression which includes these variables. Must
+#' have same number of rows as `net`.
+#' @param data_dir The directory in which data are to be, or have previously
+#' been, downloaded.
 #' @export
-optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
+optim_layer2 <- function (net, from = "subway", to = "disperse",
                           flowvars = NULL, data_dir)
 {
-    if (is.null (k))
-        stop ("Initial value of 'k' must be provided, as returned from ",
-              "'optim_layer1'")
-
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
     dp <- dodgr::dodgr_dists (net, from = p$id)
 
-    txt <- paste0 ("Optimising 2-parameter model fit from ", from, " to ", to)
+    txt <- paste0 ("Optimising model fit from ", from, " to ", to)
     message (cli::rule (center = txt, line = 2, col = "green"))
 
-    loop1 <- function (net, from, to, d, dp, s, k, ks, data_dir, flowvars,
-                       kvals, ksvals, prfx)
+    k_scale <- list (1:30 * 100, -20:20 * 10)
+    ks_scale <- list (-10:20 / 10, -10:10 / 10)
+    ks <- 0.0
+    k <- 0
+    k_old <- ks_old <- 9999
+    niters <- 1
+    index <- 1 # index in to k/ks_scale
+    while (k_old != k & ks_old != ks)
     {
-        # Fit ks:
-        message (cli::col_cyan (cli::symbol$star), " ", prfx, " ks search [",
-                 paste (range (ksvals), collapse = " -> "), "]")
-        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars,
-                          data_dir, ksvals, fitk = FALSE)
-        ks_old <- ks
-        ks <- ss$kmin
-        message (cli::col_green (cli::symbol$star), " ", prfx,
-                 " ks value = ", ks)
-
-        # Then re-fit k:
         k_old <- k
-        if (ks != ks_old)
+        ks_old <- ks
+
+        kvals <- k + k_scale [[index]]
+        kvals <- kvals [which (kvals > 0)]
+        message (cli::col_cyan (cli::symbol$star), " Iteration#", niters,
+                 " : k values [",
+                 paste0 (range (kvals), collapse = " -> "), "]")
+        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
+                          kvals, fitk = TRUE)
+        k <- ss$k
+        message (cli::col_green (cli::symbol$star), " Iteration#", niters,
+                 " : k value = ", k, "; r2 = ", signif (ss$r2, 4))
+
+        niters2 <- 1
+        while (k == min (kvals))
         {
-            kvals <- k + kvals
-            message (cli::col_cyan (cli::symbol$star), " ", prfx, " k search [",
-                     paste (range (kvals), collapse = " -> "), "]")
+            kvals <- kvals - diff (range (kvals))
+            message (cli::col_cyan (cli::symbol$star), " Iteration#", niters,
+                     " - Loop (", niters2, LETTERS [niters2], ") k search [",
+                     paste0 (range (kvals), collapse = " -> "), "]")
             ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars,
                               data_dir, kvals, fitk = TRUE)
-
-            niters2 <- 1
-            while (ss$kmin == min (ss$k))
-            {
-                kvals <- kvals - diff (range (kvals))
-                kvals <- kvals [kvals > 0]
-                message (cli::col_cyan (cli::symbol$star), " Loop (", niters,
-                         LETTERS [niters2], ") k search [",
-                         paste0 (range (kvals), collapse = " -> "), "]")
-                ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars,
-                                  data_dir, kvals, fitk = TRUE)
-                k <- ss$kmin
-                message (cli::col_green (cli::symbol$star), " Loop (", niters,
-                         LETTERS [niters2], ") k = ", k)
-                niters2 <- niters2 + 1
-                if (niters2 > 10)
-                    break
-            }
-            k <- ss$kmin
-            message (cli::col_green (cli::symbol$star), " ", prfx,
-                     " k value = ", k)
+            k <- ss$k
+            message (cli::col_green (cli::symbol$star), " Iteration#", niters,
+                     " - Loop (", niters2, LETTERS [niters2], ") k = ", k)
+            niters2 <- niters2 + 1
+            if (niters2 > 10)
+                break
         }
 
-        return (list (k = k, k_old = k_old, ks = ks, ks_old = ks_old, ss = ss))
-    }
+        kvals <- ks + ks_scale [[index]]
+        message (cli::col_cyan (cli::symbol$star), " Iteration#", niters,
+                 " : ks values [",
+                 paste0 (range (kvals), collapse = " -> "), "]")
+        ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
+                          kvals, fitk = FALSE)
+        ks <- ss$ks
+        message (cli::col_green (cli::symbol$star), " Iteration#", niters,
+                 " : ks value = ", ks, "; r2 = ", signif (ss$r2, 4))
 
-    # Initial loop:
-    ks <- 0
-    res <- loop1 (net, from, to, d, dp, s, k, ks, data_dir, flowvars,
-                  kvals = -2:8 * 100, ksvals = -5:10 / 5, "Initial")
-    k_old <- k
-    ks_old <- ks
-    k <- res$k
-    ks <- res$ks
-
-    niters <- 1
-    while (abs (k - k_old) > 0 & abs (ks - ks_old) > 0)
-    {
-        kvals <- k + -5:5 * 10
-        ksvals <- ks + -5:5 / 10
-        res <- loop1 (net, from, to, do, dp, s, k, ks, data_dir, flowvars,
-                      kvals = kvals, ksvals = ksvals,
-                      paste0 ("Loop [", niters, "]"))
+        index <- 2
         niters <- niters + 1
-        k_old <- k
-        ks_old <- ks
-        k <- res$k
-        ks <- res$ks
-
         if (niters > 10)
         {
-            message ("failed to converge after ", niters, " iterations")
+            warning ("Failed to converge after 10 iterations")
             break
         }
     }
 
     star <- cli::symbol$star
     label <- c (paste (star, from, " -> ", to, star),
-                paste ("k = ", k),
-                paste ("ks = ", ks),
-                paste (expression (R^2), " = ", signif (res$ss$r2, 3)))
+                paste ("k = ", ss$k),
+                paste ("ks = ", ss$ks),
+                paste (expression (R^2), " = ", signif (ss$r2, 4)))
     message (cli::boxx (
                         cli::col_white (label),
                         border_style = "round",
@@ -182,8 +193,10 @@ optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
                         ))
     message (cli::rule (center = "FINISHED", line = 2, col = "green"), "\n")
 
-    c (k = k, ks = ks, r2 = res$ss$r2)
+    ss$stats <- NULL
+    return (ss)
 }
+
 
 fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
                         kvals, fitk = TRUE)
@@ -228,9 +241,12 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
                                      ki, ksi, p, dp, flowvars, data_dir)
     }
 
-    res <- loess_fit (x, temp)
-    return (list (k = x, ss = temp [, 1], r2 = temp [, 2],
-                  stats = res))
+    i <- which.min (temp$stats$ss)
+    return (list (k = temp$stats$k [i],
+                  ks = temp$stats$ks [i],
+                  ss = temp$stats$ss [i],
+                  r2 = temp$stats$r2 [i],
+                  stats = temp$stats))
 }
 
 #' calc_layer
@@ -241,7 +257,8 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
 #' @param k_scale Scale `k` to size of origins (`s`), so
 #' `k = k ^ (1 + s / smax)`.
 #' @export
-calc_layer <- function (net, from = "subway", to = "disperse", k, k_scale, data_dir)
+calc_layer <- function (net, from = "subway", to = "disperse", k, k_scale,
+                        data_dir)
 {
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
@@ -330,6 +347,7 @@ get_subway_dat <- function (s)
 disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, flowvars,
                                 data_dir)
 {
+    nk <- length (k)
     nvals <- rep (fr_dat$n, length (k))
     kvals <- t (matrix (k ^ (1 + ks * nvals / max (nvals)), nrow = length (k)))
 
@@ -348,14 +366,17 @@ disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, flowvars,
     }
     stats <- vapply (seq (ncol (flows)), function (i)
                      getstats (p, flowvars, flows, i), numeric (2))
-    stats <- t (stats) # cols are then (ss, r2)
+    stats <- data.frame (k = k, ks = ks, t (stats))
 
-    return (stats)
+    flowvars <- cbind (flowvars, flows [, which.min (stats [, 1])])
+
+    return (list (stats = stats, p = cbind (p, flowvars)))
 }
 
 aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
                                  flowvars, data_dir)
 {
+    nk <- length (k)
     nvals <- rep (fr_dat$n, length (k))
     kvals <- matrix (k ^ (1 + ks * nvals / max (nvals)), ncol = length (k))
 
@@ -376,9 +397,11 @@ aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
     }
     stats <- vapply (seq (ncol (flows)), function (i)
                      getstats (p, flowvars, flows, i), numeric (2))
-    stats <- t (stats) # cols are then (ss, r2)
+    stats <- data.frame (k = k, ks = ks, t (stats))
 
-    return (stats)
+    flowvars <- cbind (flowvars, flows [, which.min (stats [, 1])])
+
+    return (list (stats = stats, p = cbind (p, flowvars)))
 }
 
 # fit loess smoother to result of aggregate/disperse_one_layer, and return
@@ -405,5 +428,5 @@ loess_fit <- function (x, stats)
             fit <- stats::predict (mod2, newdata = data.frame (x2 = x))
     }
     i <- which.min (fit)
-    c (k = x [i], ss = ss [i], r2 = r2 [i])
+    c (i = i, k = x [i], ss = ss [i], r2 = r2 [i])
 }
