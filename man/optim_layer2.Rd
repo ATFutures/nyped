@@ -4,8 +4,8 @@
 \alias{optim_layer2}
 \title{optim_layer2}
 \usage{
-optim_layer2(net, from = "subway", to = "disperse", k = NULL,
-  flowvars = NULL, data_dir)
+optim_layer2(net, from = "subway", to = "disperse", flowvars = NULL,
+  data_dir)
 }
 \arguments{
 \item{net}{Weighted street network; loaded from `data_dir` if not provided}
@@ -17,8 +17,6 @@ optim_layer2(net, from = "subway", to = "disperse", k = NULL,
 "residential", "education", "entertainment", "healthcare", "sustenance",
 "transportation", or "disperse" for a general dispersal model.}
 
-\item{k}{Width of exponential decay (in m) for spatial interaction models}
-
 \item{flowvars}{A `data.frame` of flows from previously calculated layers. If
 provided, these are included in the model, and the target layer is optimised
 as part of a multiple linear regression which includes these variables. Must
@@ -28,8 +26,8 @@ have same number of rows as `net`.}
 been, downloaded.}
 }
 \description{
-Optimise `k` and `k_scale` parameters to optimally fit flow layer to observed
-pedestrian densities. Note that optimisation can't be implemented directly
-because results are too noisy, so a series of custom ranges is scanned, and
-optimal values found from loess fits.
+Optimise flow layer to observed pedestrian densities according to single `k`
+parameter. Note that optimisation can't be implemented directly because
+results are too noisy, so a series of custom ranges is scanned, and optimal
+values found from loess fits.
 }

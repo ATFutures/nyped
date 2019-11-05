@@ -5,7 +5,7 @@
 \title{optim_layer1}
 \usage{
 optim_layer1(net, from = "subway", to = "disperse", flowvars = NULL,
-  data_dir, cache = TRUE)
+  data_dir)
 }
 \arguments{
 \item{net}{Weighted street network; loaded from `data_dir` if not provided}
@@ -24,9 +24,6 @@ have same number of rows as `net`.}
 
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
-
-\item{cache}{If `TRUE`, layers are cached in a sub-directory of `data_dir`
-for later reloading.}
 }
 \description{
 Optimise flow layer to observed pedestrian densities according to single `k`
