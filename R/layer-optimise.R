@@ -17,11 +17,9 @@
 #' have same number of rows as `net`.
 #' @param data_dir The directory in which data are to be, or have previously
 #' been, downloaded.
-#' @param cache If `TRUE`, layers are cached in a sub-directory of `data_dir`
-#' for later reloading.
 #' @export
 optim_layer1 <- function (net, from = "subway", to = "disperse",
-                          flowvars = NULL, data_dir, cache = TRUE)
+                          flowvars = NULL, data_dir)
 {
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
@@ -31,7 +29,7 @@ optim_layer1 <- function (net, from = "subway", to = "disperse",
     txt <- paste0 ("Optimising model fit from ", from, " to ", to)
     message (cli::rule (center = txt, line = 2, col = "green"))
 
-    kscale <- list (1:15 * 200, -5:5 * 100, -5:5 * 20, -5:5 * 10)
+    kscale <- list (1:30 * 100, -5:5 * 100, -5:5 * 20, -5:5 * 10)
     prfx <- c ("Initial", "Second", "Third", "Final")
     ks <- 0.0
     k <- 0
@@ -43,7 +41,7 @@ optim_layer1 <- function (net, from = "subway", to = "disperse",
                  " k values [",
                  paste0 (range (kvals), collapse = " -> "), "]")
         ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
-                          kvals, fitk = TRUE, cache = cache)
+                          kvals, fitk = TRUE)
         k <- ss$kmin
         message (cli::col_green (cli::symbol$star), " ", prfx [i],
                  " k value = ", k, "; r2 = ", signif (ss$r2, 4))
@@ -188,7 +186,7 @@ optim_layer2 <- function (net, from = "subway", to = "disperse", k = NULL,
 }
 
 fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
-                        kvals, fitk = TRUE, cache = TRUE, plot = FALSE)
+                        kvals, fitk = TRUE)
 {
     lspan <- 0.75 # fixed span of loess fits
     if (fitk)
@@ -215,23 +213,8 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
 
     if (to == "disperse")
     {
-        ss <- r2 <- rep (NA, length (x))
-        i <- NULL # suppress no visible binding note
-        pb <- utils::txtProgressBar (style = 3)
-        for (i in seq (x)) {
-            temp <- disperse_one_layer (net, from, fr_dat, ki [i], ksi [i],
-                                        p, dp, flowvars,
-                                        data_dir, cache = cache)
-            r2 [i] <- temp$stats [3]
-            ss [i] <- temp$stats [4]
-            utils::setTxtProgressBar (pb, i / length (x))
-            if (i > 2 & all (diff (ss [!is.na (ss)]) > 0))
-                break # lowest SS is first k
-        }
-        close (pb)
-
-        i <- which.min (ss)
-        r2 <- r2 [i]
+        temp <- disperse_one_layer (net, from, fr_dat, ki, ksi, p, dp,
+                                    flowvars, data_dir)
     } else
     {
         if (to == "residential")
@@ -243,30 +226,11 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
 
         temp <- aggregate_one_layer (net, from, to, fr_dat, to_dat,
                                      ki, ksi, p, dp, flowvars, data_dir)
-        ss <- temp$ss
-
-        mod <- stats::loess (ss ~ x, span = lspan)
-        fit <- stats::predict (mod)
-        sdlim <- 2 * stats::sd (mod$residuals)
-        n <- length (which (abs (mod$residuals) > sdlim))
-        if (n > 0 & n < 3 & length (x) > 6) # remove extreme values
-        {
-            index <- which (abs (mod$residuals) <= sdlim)
-            x2 <- x [index]
-            y <- ss [index]
-            mod2 <- tryCatch ({
-                stats::loess (y ~ x2, span = lspan)},
-                warning = function (w) { NULL },
-                error = function (e) { NULL })
-            if (!is.null (mod2))
-                fit <- stats::predict (mod2, newdata = data.frame (x2 = x))
-        }
-        i <- which.min (fit)
-        r2 = temp$r2 [i]
     }
 
-
-    return (list (k = x, ss = ss, kmin = x [i], r2 = r2))
+    res <- loess_fit (x, temp)
+    return (list (k = x, ss = temp [, 1], r2 = temp [, 2],
+                  stats = res))
 }
 
 #' calc_layer
@@ -297,7 +261,7 @@ calc_layer <- function (net, from = "subway", to = "disperse", k, k_scale, data_
     if (to == "disperse")
     {
         temp <- disperse_one_layer (net, from, fr_dat, k, k_scale, p, dp,
-                                    flowvars = NULL, data_dir, cache = TRUE)
+                                    flowvars = NULL, data_dir)
     } else
     {
         if (to == "residential")
@@ -364,76 +328,82 @@ get_subway_dat <- function (s)
 }
 
 disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, flowvars,
-                                data_dir, cache = TRUE)
+                                data_dir)
 {
-    to <- "disperse"
-    f <- get_file_name (data_dir, from, to, k, ks)
-    if (file.exists (f) & cache)
-    {
-        net_f <- readRDS (f)
-    } else
-    {
-        kvals <- k ^ (1 + ks * fr_dat$n / max (fr_dat$n))
-        net_f <- dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
-                                              dens = fr_dat$n, k = kvals)
-        if (cache)
-            cache_layer (net_f, data_dir, from, to, k, ks)
-    }
-    flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
-    flowvars <- rbind (flowvars, flows)
-    p$flow <- flows
+    nvals <- rep (fr_dat$n, length (k))
+    kvals <- t (matrix (k ^ (1 + ks * nvals / max (nvals)), nrow = length (k)))
 
-    mod <- summary (stats::lm (p$week ~ flows))
-    list (stats = c (k = k,
-                     k_scale = ks,
-                     r2 = mod$adj.r.squared,
-                     ss = sum (mod$residuals ^ 2) /
-                         length (mod$residuals) / 1e6),
-          p = p)
+    net_f <- dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
+                                          dens = fr_dat$n, k = kvals)
+
+    flows <- flow_to_ped_pts (net_f, p, dp)
+
+    # find which (k, ks) pair gives minimal error
+    getstats <- function (p, flowvars, flows, i)
+    {
+        flowvars_i <- cbind (flowvars, flows [, i])
+        mod <- summary (stats::lm (p$week ~ flowvars_i))
+        c (ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6,
+           r2 = mod$r.squared)
+    }
+    stats <- vapply (seq (ncol (flows)), function (i)
+                     getstats (p, flowvars, flows, i), numeric (2))
+    stats <- t (stats) # cols are then (ss, r2)
+
+    return (stats)
 }
 
 aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
                                  flowvars, data_dir)
 {
     nvals <- rep (fr_dat$n, length (k))
-    kvals <- k ^ (1 + ks * nvals / max (nvals))
+    kvals <- matrix (k ^ (1 + ks * nvals / max (nvals)), ncol = length (k))
 
     net_f <- dodgr::dodgr_flows_si (net, from = fr_dat$id,
                                     to = to_dat$id, k = kvals,
                                     dens_from = fr_dat$n,
                                     dens_to = to_dat$n)
 
-    flows <- flow_to_ped_pts (net_f, p, dp, get_nearest = TRUE)
+    flows <- flow_to_ped_pts (net_f, p, dp)
 
     # find which (k, ks) pair gives minimal error
-    getss <- function (p, flowvars, flows, i)
+    getstats <- function (p, flowvars, flows, i)
     {
         flowvars_i <- cbind (flowvars, flows [, i])
         mod <- summary (stats::lm (p$week ~ flowvars_i))
-        sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6
+        c (ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6,
+           r2 = mod$r.squared)
     }
-    getr2 <- function (p, flowvars, flows, i)
+    stats <- vapply (seq (ncol (flows)), function (i)
+                     getstats (p, flowvars, flows, i), numeric (2))
+    stats <- t (stats) # cols are then (ss, r2)
+
+    return (stats)
+}
+
+# fit loess smoother to result of aggregate/disperse_one_layer, and return
+# parameters at minimum of smoothed fit
+loess_fit <- function (x, stats)
+{
+    lspan <- 0.75
+    ss <- stats [, 1]
+    r2 <- stats [, 2]
+    mod <- stats::loess (ss ~ x, span = lspan)
+    fit <- stats::predict (mod)
+    sdlim <- 2 * stats::sd (mod$residuals)
+    n <- length (which (abs (mod$residuals) > sdlim))
+    if (n > 0 & n < 3 & length (x) > 6) # remove extreme values
     {
-        flowvars_i <- cbind (flowvars, flows [, i])
-        mod <- summary (stats::lm (p$week ~ flowvars_i))
-        mod$r.squared
+        index <- which (abs (mod$residuals) <= sdlim)
+        x2 <- x [index]
+        y <- ss [index]
+        mod2 <- tryCatch ({
+            stats::loess (y ~ x2, span = lspan)},
+            warning = function (w) { NULL },
+            error = function (e) { NULL })
+        if (!is.null (mod2))
+            fit <- stats::predict (mod2, newdata = data.frame (x2 = x))
     }
-    ss <- vapply (seq (ncol (flows)), function (i)
-                  getss (p, flowvars, flows, i), numeric (1))
-    r2 <- vapply (seq (ncol (flows)), function (i)
-                  getr2 (p, flowvars, flows, i), numeric (1))
-    imin <- which.min (ss)
-    flowvars_i <- cbind (flowvars, flows [, imin])
-    mod <- summary (stats::lm (p$week ~ flowvars_i))
-
-    p$flow <- flows [, imin]
-
-    list (ss = ss,
-          r2 = r2,
-          stats = c (k = k [imin],
-                     k_scale = ks [imin],
-                     r2 = r2 [imin],
-                     ss = sum (mod$residuals ^ 2) /
-                         length (mod$residuals) / 1e6),
-          p = p)
+    i <- which.min (fit)
+    c (k = x [i], ss = ss [i], r2 = r2 [i])
 }

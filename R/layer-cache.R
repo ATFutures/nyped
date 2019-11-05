@@ -105,8 +105,10 @@ d_subway_res <- function (net, s, nodes_new, data_dir)
 # *********************   MISC EXTRA FUNCTIONS   *********************
 # ********************************************************************
 
-flow_to_ped_pts <- function (net_f, p, dp, get_nearest = TRUE)
+flow_to_ped_pts <- function (net_f, p, dp)
 {
+    if (methods::is (net_f, "tbl"))
+        net_f <- as.data.frame (net_f)
     fcols <- grep ("flow", names (net_f))
     flows <- array (NA, dim = c (nrow (p), length (fcols)))
 
