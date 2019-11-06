@@ -4,7 +4,14 @@
 #' rcpp_flow_to_ped_pts
 #'
 #' @noRd
-rcpp_flow_to_ped_pts <- function(graph, ped, dmat, n) {
-    .Call(`_calibration_rcpp_flow_to_ped_pts`, graph, ped, dmat, n)
+rcpp_flow_to_ped_pts <- function(graph, ped, dmat, flow_col_name, n) {
+    .Call(`_calibration_rcpp_flow_to_ped_pts`, graph, ped, dmat, flow_col_name, n)
+}
+
+#' rcpp_match_flow_mats
+#'
+#' @noRd
+rcpp_match_flow_mats <- function(flows, index0, index1, fcols, n) {
+    .Call(`_calibration_rcpp_match_flow_mats`, flows, index0, index1, fcols, n)
 }
 
