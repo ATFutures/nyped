@@ -92,6 +92,76 @@ optim_layer1 <- function (net, from = "subway", to = "disperse",
     return (ss)
 }
 
+#' get_layer
+#'
+#' Append network with flow columns between nominated places
+#' @inheritParams optim_layer1
+#' @export
+get_layer <- function (net, from = "subway", to = "disperse", data_dir)
+{
+    p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
+    s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
+    net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
+    dp <- dodgr::dodgr_dists (net, from = p$id)
+    v <- dodgr::dodgr_vertices (net)
+
+    txt <- paste0 ("Getting layer between ", from, " to ", to)
+    message (cli::rule (center = txt, line = 2, col = "green"))
+
+    ks <- 0
+    k <- 1:30 * 100
+    nk <- length (k)
+
+
+    # get fr_dat with columns of (id, n), where id is matched to v$id
+    if (from == "residential")
+    {
+        net <- reverse_net (net)
+        fr_dat <- get_res_dat (v, data_dir)
+    } else if (from == "subway")
+        fr_dat <- get_subway_dat (s)
+    else
+        fr_dat <- get_attractor_layer (data_dir, v, type = from)
+
+    nvals <- rep (fr_dat$n, length (k))
+    kvals <- t (matrix (k ^ (1 + ks * nvals / max (nvals)), nrow = length (k)))
+
+    if (to == "disperse")
+    {
+        message (cli::col_cyan (cli::symbol$star), " Disersing layer ... ",
+                 appendLF = FALSE)
+        net_f <- dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
+                                              dens = fr_dat$n, k = kvals)
+        message ("\r", cli::col_green (cli::symbol$tick),
+                 " Disersed layer     ")
+    } else
+    {
+        if (to == "residential")
+            to_dat <- get_res_dat (v, data_dir)
+        else if (to == "subway")
+            to_dat <- get_subway_dat (s)
+        else
+            to_dat <- get_attractor_layer (data_dir, v, type = to)
+
+        message (cli::col_cyan (cli::symbol$star), " Aggregating layer ... ",
+                 appendLF = FALSE)
+        net_f <- dodgr::dodgr_flows_si (net, from = fr_dat$id,
+                                        to = to_dat$id, k = kvals,
+                                        dens_from = fr_dat$n,
+                                        dens_to = to_dat$n)
+        message ("\r", cli::col_green (cli::symbol$tick),
+                 " Aggregated layer     ")
+    }
+
+    f <- file.path (data_dir, "calibration",
+                    paste0 ("net-", substr (from, 1, 3), "-",
+                            substr (to, 1, 3), ".Rds"))
+
+    saveRDS (net_f, file = f)
+
+    return (net_f)
+}
+
 #' optim_layer2
 #'
 #' Optimise flow layer to observed pedestrian densities according to single `k`
