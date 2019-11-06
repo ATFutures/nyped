@@ -105,7 +105,7 @@ get_layer <- function (net, from = "subway", to = "disperse", data_dir)
     dp <- dodgr::dodgr_dists (net, from = p$id)
     v <- dodgr::dodgr_vertices (net)
 
-    txt <- paste0 ("Getting layer between ", from, " to ", to)
+    txt <- paste0 (from, " to ", to)
     message (cli::rule (center = txt, line = 2, col = "green"))
 
     ks <- 0
@@ -114,10 +114,17 @@ get_layer <- function (net, from = "subway", to = "disperse", data_dir)
 
 
     # get fr_dat with columns of (id, n), where id is matched to v$id
-    if (from == "residential")
+    reverse <- FALSE
+    if (from == "centrality")
+    {
+        net <- reverse_net (net)
+        reverse <- TRUE
+        fr_dat <- get_attractor_layer (data_dir, v, type = from)
+    } else if (from == "residential" & to != "centrality")
     {
         net <- reverse_net (net)
         fr_dat <- get_res_dat (v, data_dir)
+        reverse <- TRUE
     } else if (from == "subway")
         fr_dat <- get_subway_dat (s)
     else
@@ -130,10 +137,12 @@ get_layer <- function (net, from = "subway", to = "disperse", data_dir)
     {
         message (cli::col_cyan (cli::symbol$star), " Disersing layer ... ",
                  appendLF = FALSE)
+        st0 <- Sys.time ()
         net_f <- dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
                                               dens = fr_dat$n, k = kvals)
+        ti <- format_time_int (st0)
         message ("\r", cli::col_green (cli::symbol$tick),
-                 " Disersed layer     ")
+                 " Disersed layer in ", ti)
     } else
     {
         if (to == "residential")
@@ -145,13 +154,18 @@ get_layer <- function (net, from = "subway", to = "disperse", data_dir)
 
         message (cli::col_cyan (cli::symbol$star), " Aggregating layer ... ",
                  appendLF = FALSE)
+        st0 <- Sys.time ()
         net_f <- dodgr::dodgr_flows_si (net, from = fr_dat$id,
                                         to = to_dat$id, k = kvals,
                                         dens_from = fr_dat$n,
                                         dens_to = to_dat$n)
+        ti <- format_time_int (st0)
         message ("\r", cli::col_green (cli::symbol$tick),
-                 " Aggregated layer     ")
+                 " Aggregated layer in ", ti)
     }
+
+    if (reverse)
+        net_f <- reverse_net (net_f)
 
     f <- file.path (data_dir, "calibration",
                     paste0 ("net-", substr (from, 1, 3), "-",
@@ -498,7 +512,7 @@ loess_fit <- function (x, stats)
     c (i = i, k = x [i], ss = ss [i], r2 = r2 [i])
 }
 
-opt_fit_to_ped <- function (net_f, p, dp, flowvars)
+opt_fit_to_ped <- function (net_f, p, dp, flowvars = NULL)
 {
     fcols <- grep ("flow", names (net_f))
     #flows <- array (NA, dim = c (nrow (p), length (fcols)))
