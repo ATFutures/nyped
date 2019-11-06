@@ -4,7 +4,7 @@
 #' rcpp_flow_to_ped_pts
 #'
 #' @noRd
-rcpp_flow_to_ped_pts <- function(graph) {
-    .Call(`_calibration_rcpp_flow_to_ped_pts`, graph)
+rcpp_flow_to_ped_pts <- function(graph, ped, dmat, n) {
+    .Call(`_calibration_rcpp_flow_to_ped_pts`, graph, ped, dmat, n)
 }
 

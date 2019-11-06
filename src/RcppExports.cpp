@@ -6,19 +6,22 @@
 using namespace Rcpp;
 
 // rcpp_flow_to_ped_pts
-Rcpp::NumericVector rcpp_flow_to_ped_pts(const Rcpp::DataFrame graph);
-RcppExport SEXP _calibration_rcpp_flow_to_ped_pts(SEXP graphSEXP) {
+Rcpp::NumericVector rcpp_flow_to_ped_pts(Rcpp::DataFrame graph, Rcpp::DataFrame ped, Rcpp::NumericMatrix dmat, const int n);
+RcppExport SEXP _calibration_rcpp_flow_to_ped_pts(SEXP graphSEXP, SEXP pedSEXP, SEXP dmatSEXP, SEXP nSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const Rcpp::DataFrame >::type graph(graphSEXP);
-    rcpp_result_gen = Rcpp::wrap(rcpp_flow_to_ped_pts(graph));
+    Rcpp::traits::input_parameter< Rcpp::DataFrame >::type graph(graphSEXP);
+    Rcpp::traits::input_parameter< Rcpp::DataFrame >::type ped(pedSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type dmat(dmatSEXP);
+    Rcpp::traits::input_parameter< const int >::type n(nSEXP);
+    rcpp_result_gen = Rcpp::wrap(rcpp_flow_to_ped_pts(graph, ped, dmat, n));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_calibration_rcpp_flow_to_ped_pts", (DL_FUNC) &_calibration_rcpp_flow_to_ped_pts, 1},
+    {"_calibration_rcpp_flow_to_ped_pts", (DL_FUNC) &_calibration_rcpp_flow_to_ped_pts, 4},
     {NULL, NULL, 0}
 };
 
