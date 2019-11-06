@@ -74,12 +74,11 @@ optim_layer1 <- function (net, from = "subway", to = "disperse",
     k <- 0
     ss <- fit_one_ks (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
                       kvals, fitk = TRUE)
-    k <- ss$k
 
     star <- cli::symbol$star
     label <- c (paste (star, from, " -> ", to, star),
-                paste ("k = ", ss$k),
-                paste (expression (R^2), " = ", signif (ss$r2, 4)))
+                paste ("k = ", ss$stats$k),
+                paste (expression (R^2), " = ", signif (ss$stats$r2, 4)))
     message (cli::boxx (
                         cli::col_black (label),
                         border_style = "round",
@@ -246,13 +245,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
                                      ki, ksi, p, dp, flowvars, data_dir)
     }
 
-    i <- which.min (temp$stats$ss)
-    return (list (k = temp$stats$k [i],
-                  ks = temp$stats$ks [i],
-                  ss = temp$stats$ss [i],
-                  r2 = temp$stats$r2 [i],
-                  stats = temp$stats,
-                  p = temp$p))
+    return (temp)
 }
 
 #' calc_layer
@@ -358,24 +351,22 @@ disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, flowvars,
     nvals <- rep (fr_dat$n, length (k))
     kvals <- t (matrix (k ^ (1 + ks * nvals / max (nvals)), nrow = length (k)))
 
+    message (cli::col_cyan (cli::symbol$star), " Disersing layer ... ",
+             appendLF = FALSE)
     net_f <- dodgr::dodgr_flows_disperse (net, from = fr_dat$id,
                                           dens = fr_dat$n, k = kvals)
+    message ("\r", cli::col_green (cli::symbol$tick), " Disersed layer     ")
 
-    flows <- flow_to_ped_pts (net_f, p, dp)
+    message (cli::col_cyan (cli::symbol$star),
+             " Optimising fit to pedestrian data ... ", appendLF = FALSE)
+    fit <- opt_fit_to_ped (net_f, p, dp, flowvars)
+    message ("\r", cli::col_green (cli::symbol$tick),
+             " Optimised fit to pedestrian data : R2 = ",
+             formatC (fit$r2, format = "f", digits = 4), " at k = ",
+             k [fit$k], "m")
+    flow <- fit$flow
 
-    # find which (k, ks) pair gives minimal error
-    getstats <- function (p, flowvars, flows, i)
-    {
-        flowvars_i <- cbind (flowvars, flows [, i])
-        mod <- summary (stats::lm (p$week ~ flowvars_i))
-        c (ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6,
-           r2 = mod$r.squared)
-    }
-    stats <- vapply (seq (ncol (flows)), function (i)
-                     getstats (p, flowvars, flows, i), numeric (2))
-    stats <- data.frame (k = k, ks = ks, t (stats))
-
-    flowvars <- cbind (flowvars, flows [, which.min (stats [, 1])])
+    flowvars <- cbind (flowvars, fit$flow)
 
     return (list (stats = stats, p = cbind (p, flowvars)))
 }
@@ -387,28 +378,27 @@ aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
     nvals <- rep (fr_dat$n, length (k))
     kvals <- matrix (k ^ (1 + ks * nvals / max (nvals)), ncol = length (k))
 
+    message (cli::col_cyan (cli::symbol$star), " Aggregating layer ... ",
+             appendLF = FALSE)
     net_f <- dodgr::dodgr_flows_si (net, from = fr_dat$id,
                                     to = to_dat$id, k = kvals,
                                     dens_from = fr_dat$n,
                                     dens_to = to_dat$n)
+    message ("\r", cli::col_green (cli::symbol$tick), " Aggregated layer     ")
 
-    flows <- flow_to_ped_pts (net_f, p, dp)
+    message (cli::col_cyan (cli::symbol$star),
+             " Optimising fit to pedestrian data ... ", appendLF = FALSE)
+    fit <- opt_fit_to_ped (net_f, p, dp, flowvars)
+    message ("\r", cli::col_green (cli::symbol$tick),
+             " Optimised fit to pedestrian data : R2 = ",
+             formatC (fit$r2, format = "f", digits = 4), " at k = ",
+             k [fit$k], "m")
 
-    # find which (k, ks) pair gives minimal error
-    getstats <- function (p, flowvars, flows, i)
-    {
-        flowvars_i <- cbind (flowvars, flows [, i])
-        mod <- summary (stats::lm (p$week ~ flowvars_i))
-        c (ss = sum (mod$residuals ^ 2) / length (mod$residuals) / 1e6,
-           r2 = mod$r.squared)
-    }
-    stats <- vapply (seq (ncol (flows)), function (i)
-                     getstats (p, flowvars, flows, i), numeric (2))
-    stats <- data.frame (k = k, ks = ks, t (stats))
+    flowvars <- cbind (flowvars, fit$flow)
 
-    flowvars <- cbind (flowvars, flows [, which.min (stats [, 1])])
+    stats <- list (k = k [fit$k], r2 = fit$r2)
 
-    return (list (stats = stats, p = cbind (p, flowvars)))
+    return (list (stats = stats, flowvars = flowvars))
 }
 
 # fit loess smoother to result of aggregate/disperse_one_layer, and return
@@ -436,4 +426,60 @@ loess_fit <- function (x, stats)
     }
     i <- which.min (fit)
     c (i = i, k = x [i], ss = ss [i], r2 = r2 [i])
+}
+
+opt_fit_to_ped <- function (net_f, p, dp, flowvars)
+{
+    fcols <- grep ("flow", names (net_f))
+    #flows <- array (NA, dim = c (nrow (p), length (fcols)))
+    # convert dp to equivalent matrix of vertex names sorted in order of increasing
+    # distance from each p
+    sorted_verts <- function (dmat)
+    {
+        res <- array (NA, dim = dim (dmat))
+        for (i in seq (nrow (dmat)))
+        {
+            res [i, ] <- colnames (dmat) [order (dmat [i, ])]
+        }
+        return (res)
+    }
+    dp_verts <- sorted_verts (dp)
+    # then convert that to equivalent indices into both .vx0 and .vx1 of net_f
+    index0 <- t (apply (dp_verts, 1, function (i) match (i, net_f$.vx0)))
+    index1 <- t (apply (dp_verts, 1, function (i) match (i, net_f$.vx1)))
+
+    flowmat <- as.matrix (net_f [, fcols])
+    n <- 1:20
+    ss <- rep (NA, length (n))
+    ssmin <- .Machine$double.xmax
+    res <- n_out <- k_out <- r2_out <- NULL
+    pb <- utils::txtProgressBar (style = 3)
+    for (i in seq (n))
+    {
+        temp <- rcpp_match_flow_mats (flowmat, index0 - 1, index1 - 1,
+                                     fcols - 1, n [i])
+        stats <- apply (temp, 2, function (j) {
+                            ivs <- cbind (flowvars, j)
+                            mod <- summary (lm (p$week ~ ivs))
+                            c (sum (mod$residuals ^ 2) / 1e6,
+                               mod$r.squared)  })
+        ss <- stats [1, ]
+        r2 <- stats [2, ]
+
+        if (min (ss) < ssmin)
+        {
+            res <- temp
+            n_out <- i
+            k_out <- which.min (ss)
+            ssmin <- min (ss)
+            r2_out <- r2 [k_out]
+        }
+        utils::setTxtProgressBar (pb, i / length (n))
+    }
+    close (pb)
+
+    return (list (n = n_out,
+                  k = k_out,
+                  r2 = r2_out,
+                  flow = res [, k_out]))
 }
