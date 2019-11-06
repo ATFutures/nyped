@@ -1,6 +1,6 @@
 Package: calibration
 Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.004
+Version: 0.0.0.005
 Authors@R: 
     person(given = "Mark",
            family = "Padgham",
@@ -16,9 +16,11 @@ Imports:
     dodgr,
     dplyr,
     magrittr,
+    methods,
     moveability,
     osmdata,
     raster,
+    Rcpp (>= 0.12.6),
     rvest,
     sf,
     xml2
@@ -26,4 +28,9 @@ Suggests:
     mapdeck,
     mapview,
     testthat
+LinkingTo:
+    Rcpp
+NeedsCompilation: yes
+URL: https://github.com/moveability/calibration
+BugReports: https://github.com/moveability/calibration/issues
 RoxygenNote: 6.1.1

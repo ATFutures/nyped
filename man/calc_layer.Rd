@@ -18,6 +18,8 @@ calc_layer(net, from = "subway", to = "disperse", k, k_scale, data_dir)
 "residential", "education", "entertainment", "healthcare", "sustenance",
 "transportation", or "disperse" for a general dispersal model.}
 
+\item{k}{Width of exponential decay in metres}
+
 \item{k_scale}{Scale `k` to size of origins (`s`), so
 `k = k ^ (1 + s / smax)`.}
 

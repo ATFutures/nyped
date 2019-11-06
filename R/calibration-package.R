@@ -1,4 +1,6 @@
 #' @keywords internal
+#' @importFrom Rcpp evalCpp
+#' @useDynLib calibration, .registration = TRUE
 "_PACKAGE"
 
 # The following block is used by usethis to automatically manage

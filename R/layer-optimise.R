@@ -81,16 +81,15 @@ optim_layer1 <- function (net, from = "subway", to = "disperse",
                 paste ("k = ", ss$k),
                 paste (expression (R^2), " = ", signif (ss$r2, 4)))
     message (cli::boxx (
-                        cli::col_white (label),
+                        cli::col_black (label),
                         border_style = "round",
                         padding = 1,
                         float = "center",
                         border_col = "tomato3",
-                        background_col = "deepskyblue"
+                        background_col = "yellow"
                         ))
     message (cli::rule (center = "FINISHED", line = 2, col = "green"), "\n")
 
-    ss$stats <- NULL
     return (ss)
 }
 
@@ -252,7 +251,8 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
                   ks = temp$stats$ks [i],
                   ss = temp$stats$ss [i],
                   r2 = temp$stats$r2 [i],
-                  stats = temp$stats))
+                  stats = temp$stats,
+                  p = temp$p))
 }
 
 #' calc_layer
@@ -260,6 +260,7 @@ fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
 #' using specific values of 'k' and 'ks'.
 #'
 #' @inheritParams optim_layer2
+#' @param k Width of exponential decay in metres
 #' @param k_scale Scale `k` to size of origins (`s`), so
 #' `k = k ^ (1 + s / smax)`.
 #' @export

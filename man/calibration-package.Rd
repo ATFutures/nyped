@@ -8,6 +8,14 @@
 \description{
 What the package does (one paragraph).
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/moveability/calibration}
+  \item Report bugs at \url{https://github.com/moveability/calibration/issues}
+}
+
+}
 \author{
 \strong{Maintainer}: Mark Padgham \email{mark.padgham@email.com} (0000-0003-2172-5265)
 
