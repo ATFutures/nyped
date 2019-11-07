@@ -102,16 +102,16 @@ get_layer <- function (net, from = "subway", to = "disperse", data_dir)
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
-    dp <- dodgr::dodgr_dists (net, from = p$id)
+    #dp <- dodgr::dodgr_dists (net, from = p$id)
     v <- dodgr::dodgr_vertices (net)
 
     txt <- paste0 (from, " to ", to)
     message (cli::rule (center = txt, line = 2, col = "green"))
+    message (cli::col_green (cli::symbol$star), " Started at ",
+             Sys.time ())
 
     ks <- 0
     k <- 1:30 * 100
-    nk <- length (k)
-
 
     # get fr_dat with columns of (id, n), where id is matched to v$id
     reverse <- FALSE
@@ -119,12 +119,19 @@ get_layer <- function (net, from = "subway", to = "disperse", data_dir)
     {
         net <- reverse_net (net)
         reverse <- TRUE
+        from <- to
+        to <- "centrality"
         fr_dat <- get_attractor_layer (data_dir, v, type = from)
     } else if (from == "residential" & to != "centrality")
     {
         net <- reverse_net (net)
-        fr_dat <- get_res_dat (v, data_dir)
         reverse <- TRUE
+        from <- to
+        to <- "residential"
+        if (from == "subway")
+            fr_dat <- get_subway_dat (s)
+        else
+            fr_dat <- get_attractor_layer (data_dir, v, type = from)
     } else if (from == "subway")
         fr_dat <- get_subway_dat (s)
     else
@@ -289,14 +296,13 @@ optim_layer2 <- function (net, from = "subway", to = "disperse",
 fit_one_ks <- function (net, from, to, p, dp, s, k, ks, flowvars, data_dir,
                         kvals, fitk = TRUE)
 {
-    lspan <- 0.75 # fixed span of loess fits
     if (fitk)
     {
-        ki <- x <- kvals
+        ki <- kvals
         ksi <- rep (ks, length (ki))
     } else
     {
-        ksi <- x <- kvals
+        ksi <- kvals
         ki <- rep (k, length (ksi))
     }
 
@@ -432,8 +438,8 @@ disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, flowvars,
                                 data_dir)
 {
     nk <- length (k)
-    nvals <- rep (fr_dat$n, length (k))
-    kvals <- t (matrix (k ^ (1 + ks * nvals / max (nvals)), nrow = length (k)))
+    nvals <- rep (fr_dat$n, nk)
+    kvals <- t (matrix (k ^ (1 + ks * nvals / max (nvals)), nrow = nk))
 
     message (cli::col_cyan (cli::symbol$star), " Disersing layer ... ",
              appendLF = FALSE)
@@ -448,7 +454,6 @@ disperse_one_layer <- function (net, from, fr_dat, k, ks, p, dp, flowvars,
              " Optimised fit to pedestrian data : R2 = ",
              formatC (fit$r2, format = "f", digits = 4), " at k = ",
              k [fit$k], "m")
-    flow <- fit$flow
 
     flowvars <- cbind (flowvars, fit$flow)
 
@@ -459,8 +464,8 @@ aggregate_one_layer <- function (net, from, to, fr_dat, to_dat, k, ks, p, dp,
                                  flowvars, data_dir)
 {
     nk <- length (k)
-    nvals <- rep (fr_dat$n, length (k))
-    kvals <- matrix (k ^ (1 + ks * nvals / max (nvals)), ncol = length (k))
+    nvals <- rep (fr_dat$n, nk)
+    kvals <- t (matrix (k ^ (1 + ks * nvals / max (nvals)), nrow = nk))
 
     message (cli::col_cyan (cli::symbol$star), " Aggregating layer ... ",
              appendLF = FALSE)
@@ -512,12 +517,68 @@ loess_fit <- function (x, stats)
     c (i = i, k = x [i], ss = ss [i], r2 = r2 [i])
 }
 
+#' fit_flows_to_ped
+#'
+#' Fit one network with multiple flow columns (from multiple k-values) to
+#' pedestrian counts, by aggregating each flow column across a variable number
+#' of edges ('n') nearest to each pedestrian count station.
+#'
+#' @param net_f A network with flow columns, obtained from `get_layer`
+#' @inheritParams optim_layer1
+#' @return A list containing vectors of 'k' and 'n' values, and a matrix of
+#' 30x20 = 600 columns, one for each combination of 30 'k'- and 20 'n'-values.
+#' @export
+fit_flows_to_ped <- function (net_f, data_dir)
+{
+    p <- ped_osm_id (data_dir = data_dir, net = net_f, quiet = TRUE)
+    dp <- dodgr::dodgr_dists (net_f, from = p$id)
+
+    fcols <- grep ("flow", names (net_f))
+    # convert dp to equivalent matrix of vertex names sorted in order of
+    # increasing distance from each p
+    sorted_verts <- function (dmat)
+    {
+        res <- array (NA, dim = dim (dmat))
+        for (i in seq (nrow (dmat)))
+        {
+            res [i, ] <- colnames (dmat) [order (dmat [i, ])]
+        }
+        return (res)
+    }
+    dp_verts <- sorted_verts (dp)
+    # then convert that to equivalent indices into both .vx0 and .vx1 of net_f
+    index0 <- t (apply (dp_verts, 1, function (i) match (i, net_f$.vx0)))
+    index1 <- t (apply (dp_verts, 1, function (i) match (i, net_f$.vx1)))
+
+    flowmat <- as.matrix (net_f [, fcols])
+    n <- 1:20
+    pb <- utils::txtProgressBar (style = 3)
+    temp <- list ()
+    for (i in seq (n))
+    {
+        temp [[i]] <- rcpp_match_flow_mats (flowmat, index0 - 1, index1 - 1,
+                                            fcols - 1, n [i])
+        utils::setTxtProgressBar (pb, i / length (n))
+    }
+    close (pb)
+
+    temp <- do.call (cbind, temp)
+
+    k <- 1:30 * 100
+    nk <- length (k) # 30
+    n <- 1:20
+    k <- rep (k, length (n))
+    n <- rep (n, each = nk)
+
+    list (k = k, n = n, flows = temp)
+}
+
 opt_fit_to_ped <- function (net_f, p, dp, flowvars = NULL)
 {
     fcols <- grep ("flow", names (net_f))
     #flows <- array (NA, dim = c (nrow (p), length (fcols)))
-    # convert dp to equivalent matrix of vertex names sorted in order of increasing
-    # distance from each p
+    # convert dp to equivalent matrix of vertex names sorted in order of
+    # increasing distance from each p
     sorted_verts <- function (dmat)
     {
         res <- array (NA, dim = dim (dmat))
@@ -544,7 +605,7 @@ opt_fit_to_ped <- function (net_f, p, dp, flowvars = NULL)
                                      fcols - 1, n [i])
         stats <- apply (temp, 2, function (j) {
                             ivs <- cbind (flowvars, j)
-                            mod <- summary (lm (p$week ~ ivs))
+                            mod <- summary (stats::lm (p$week ~ ivs))
                             c (sum (mod$residuals ^ 2) / 1e6,
                                mod$r.squared)  })
         ss <- stats [1, ]
