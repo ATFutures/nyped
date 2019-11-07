@@ -573,6 +573,51 @@ fit_flows_to_ped <- function (net_f, data_dir)
     list (k = k, n = n, flows = temp)
 }
 
+#' all_flows_to_ped
+#'
+#' Batch-convert all flow layers to equivalent values matched to pedestrian
+#' counting stations via the \link{fit_flows_to_ped} function.
+#'
+#' @inheritParams fit_flows_to_ped
+#' @export
+all_flows_to_ped <- function (data_dir)
+{
+    categories <- c ("subway", "centrality", "residential", "transportation",
+                     "sustenance", "entertainment", "education", "healthcare")
+    index <- t (combn (length (categories), 2))
+    ft <- data.frame (from = c (categories [index [, 1]],
+                                categories [index [, 2]]),
+                      to = c (categories [index [, 2]],
+                              categories [index [, 1]]),
+                      stringsAsFactors = FALSE)
+    ft <- rbind (ft, data.frame (from = categories,
+                                 to = "disperse",
+                                 stringsAsFactors = FALSE))
+    for (i in seq (nrow (ft)))
+    {
+        fi <- ft$from [i]
+        ti <- ft$to [i]
+        f <- file.path (data_dir, "calibration",
+                        paste0 ("net-", substring (fi, 1, 3), "-",
+                                substring (ti, 1, 3), ".Rds"))
+        if (file.exists (f))
+        {
+            fout <- file.path (data_dir, "calibration",
+                               paste0 ("ped-flows-", substring (fi, 1, 3), "-",
+                                       substring (ti, 1, 3), ".Rds"))
+            if (!file.exists (fout))
+            {
+                message (cli::col_cyan (cli::symbol$star), " ", fi, " -> ", ti, ":")
+                net_f <- readRDS (f)
+                flows <- fit_flows_to_ped (net_f, data_dir)
+                saveRDS (flows, file = fout)
+                message ("\r", cli::col_green (cli::symbol$tick),
+                         " ", fi, " -> ", ti, "\n")
+            }
+        }
+    }
+}
+
 opt_fit_to_ped <- function (net_f, p, dp, flowvars = NULL)
 {
     fcols <- grep ("flow", names (net_f))
