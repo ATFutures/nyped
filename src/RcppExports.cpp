@@ -5,21 +5,6 @@
 
 using namespace Rcpp;
 
-// rcpp_flow_to_ped_pts
-Rcpp::NumericVector rcpp_flow_to_ped_pts(Rcpp::DataFrame graph, Rcpp::DataFrame ped, Rcpp::NumericMatrix dmat, const std::string flow_col_name, const int n);
-RcppExport SEXP _calibration_rcpp_flow_to_ped_pts(SEXP graphSEXP, SEXP pedSEXP, SEXP dmatSEXP, SEXP flow_col_nameSEXP, SEXP nSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::DataFrame >::type graph(graphSEXP);
-    Rcpp::traits::input_parameter< Rcpp::DataFrame >::type ped(pedSEXP);
-    Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type dmat(dmatSEXP);
-    Rcpp::traits::input_parameter< const std::string >::type flow_col_name(flow_col_nameSEXP);
-    Rcpp::traits::input_parameter< const int >::type n(nSEXP);
-    rcpp_result_gen = Rcpp::wrap(rcpp_flow_to_ped_pts(graph, ped, dmat, flow_col_name, n));
-    return rcpp_result_gen;
-END_RCPP
-}
 // rcpp_match_flow_mats
 Rcpp::NumericMatrix rcpp_match_flow_mats(Rcpp::NumericMatrix flows, Rcpp::IntegerMatrix index0, Rcpp::IntegerMatrix index1, Rcpp::IntegerVector fcols, const int n);
 RcppExport SEXP _calibration_rcpp_match_flow_mats(SEXP flowsSEXP, SEXP index0SEXP, SEXP index1SEXP, SEXP fcolsSEXP, SEXP nSEXP) {
@@ -37,7 +22,6 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_calibration_rcpp_flow_to_ped_pts", (DL_FUNC) &_calibration_rcpp_flow_to_ped_pts, 5},
     {"_calibration_rcpp_match_flow_mats", (DL_FUNC) &_calibration_rcpp_match_flow_mats, 5},
     {NULL, NULL, 0}
 };
