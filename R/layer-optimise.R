@@ -679,19 +679,38 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
     close (pb)
 
     mod <- summary (stats::lm (yvar ~ cbind (flowvars, flows)))
-    pvals <- mod$coefficients [, 4]
+    pvals <- mod$coefficients [2:nrow (mod$coefficients), 4]
     is_significant <- FALSE
-    if (tail (pvals, 1) < 0.05)
+    if (tail (pvals, 1) < sig)
     {
         is_significant <- TRUE
-        message (cli::col_green (cli::symbol$tick),
-                 " R2 = ", signif (r2_out, 4), " for ", cli::col_red (from_out),
-                 " to ", cli::col_red (to_out))
         flowvars <- cbind (flowvars, flows)
         r2 <- c (r2, r2_out)
         from = c (from, from_out)
         to = c (to, to_out)
         colnames (flowvars) [ncol (flowvars)] <- paste0 (from_out, "-", to_out)
+
+        # Then remove any variables rendered non-significant during that step
+        if (any (pvals > sig))
+        {
+            index <- which (pvals > sig)
+            s <- ifelse (length (index) == 1, "", "s")
+            message (cli::col_red (cli::symbol$warning), " removed ",
+                     length (index), " layer", s, ": ", cli::col_blue (
+                     paste (colnames (flowvars) [index], collapse = " + ")))
+        }
+        index <- which (pvals < sig)
+        from <- from [index]
+        to <- to [index]
+        r2 <- r2 [index]
+        flowvars <- flowvars [, index, drop = FALSE]
+        # Then re-calculate model and update r2 value
+        mod <- summary (stats::lm (yvar ~ flowvars))
+        r2out <- r2 [length (r2)] <- mod$r.squared
+
+        message (cli::col_green (cli::symbol$tick),
+                 " R2 = ", signif (r2_out, 4), " for ", cli::col_red (from_out),
+                 " to ", cli::col_red (to_out))
     } else
         message (cli::col_red (cli::symbol$cross),
                  " No flows make any further significant contributions to model")
