@@ -276,7 +276,7 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
     files <- list.files (file.path (data_dir, "calibration"),
                          pattern = "ped-flows-", full.names = TRUE)
     ssmin <- .Machine$double.xmax
-    r2 <- from <- to <- flowvars <- NULL
+    r2 <- from <- to <- flowvars <- n <- k <- NULL
     if (!is.null (dat))
     {
         r2 <- dat$r2
@@ -290,7 +290,7 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
     }
     ssmin <- .Machine$double.xmax
     pb <- utils::txtProgressBar (style = 3)
-    to_out <- r2_out <- from_out <- NULL
+    to_out <- r2_out <- from_out <- k_out <- n_out <- NULL
     for (f in seq (files))
     {
         dat <- readRDS (files [f])
@@ -303,8 +303,11 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
         
         if (min (stats [, 1]) < ssmin)
         {
-            ssmin <- min (stats [, 1])
-            r2_out <- stats [which.min (stats [, 1]), 2]
+            i <- which.min (stats [, 1])
+            ssmin <- stats [i, 1]
+            r2_out <- stats [i, 2]
+            n_out <- stats$n [i]
+            k_out <- stats$k [i]
             ft <- strsplit (strsplit (files [f], "ped-flows-") [[1]] [2],
                             ".Rds") [[1]]
             from_out <- strsplit (ft, "-") [[1]] [1]
@@ -323,8 +326,10 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
         is_significant <- TRUE
         flowvars <- cbind (flowvars, flows)
         r2 <- c (r2, r2_out)
-        from = c (from, from_out)
-        to = c (to, to_out)
+        from <- c (from, from_out)
+        to <- c (to, to_out)
+        n <- c (n, n_out)
+        k <- c (k, k_out)
         colnames (flowvars) [ncol (flowvars)] <- paste0 (from_out, "-", to_out)
 
         # Then remove any variables rendered non-significant during that step
@@ -340,6 +345,8 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
         from <- from [index]
         to <- to [index]
         r2 <- r2 [index]
+        n <- n [index]
+        k <- k [index]
         flowvars <- flowvars [, index, drop = FALSE]
         # Then re-calculate model and update r2 value
         mod <- summary (stats::lm (yvar ~ flowvars))
@@ -356,6 +363,8 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
     return (list (r2 = r2,
                   from = from,
                   to = to,
+                  n = n,
+                  k = k,
                   is_significant = is_significant,
                   ped_counts = yvar,
                   flowvars = flowvars))
