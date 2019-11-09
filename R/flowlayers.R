@@ -379,3 +379,33 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
                   ped_counts = yvar,
                   flowvars = flowvars))
 }
+
+#' ped_model_to_full_flow
+#'
+#' Convert a final model of pedestrian flows at the pedestrian count stations
+#' back into a model of full flows along each edge of the entire network
+#'
+#' @param mod A final pedestrian model produced by successive calls to
+#' \link{build_ped_model}
+#' @inheritParams get_layer
+#' @export
+ped_model_to_full_flow <- function (mod, data_dir)
+{
+    files <- file.path (data_dir, "calibration",
+                        paste0 ("net-", mod$from, "-", mod$to, ".Rds"))
+    flows <- NULL
+    kvals <- 1:30 * 100
+    for (i in seq (files))
+    {
+        x <- readRDS (files [i])
+        nf <- which (kvals == mod$k [i])
+        flows <- cbind (flows, x [[paste0 ("flow", nf)]])
+    }
+
+    fnames <- paste0 ("flow-", mod$from, "-", mod$to)
+    colnames (flows) <- fnames
+
+    # Then get all the non-flow data from one file, and cbind those flows:
+    index <- which (!grepl ("flow", names (x)))
+    return (cbind (x [, index], flows))
+}
