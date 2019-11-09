@@ -282,6 +282,8 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
         r2 <- dat$r2
         from <- dat$from
         to <- dat$to
+        n <- dat$n
+        k <- dat$k
         flowvars <- dat$flowvars
         # and remove those pairs from list of files to be added
         ft <- paste0 (dat$from, "-", dat$to)
@@ -303,6 +305,9 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
                                tval)  })
         stats <- t (stats) # then 3 columns of (ss, r2, T-statistic)
         # Find min eror only for those models with positive T-statistics:
+        if (all (stats [, 3] < 0)) # no positive-correlated layers
+            next
+
         ssmin_i <- min (stats [, 1] [stats [, 3] > 0])
         
         if (ssmin_i < ssmin)
@@ -310,8 +315,8 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
             i <- which (stats [, 1] == ssmin_i)
             ssmin <- stats [i, 1]
             r2_out <- stats [i, 2]
-            n_out <- stats$n [i]
-            k_out <- stats$k [i]
+            n_out <- dat$n [i]
+            k_out <- dat$k [i]
             ft <- strsplit (strsplit (files [f], "ped-flows-") [[1]] [2],
                             ".Rds") [[1]]
             from_out <- strsplit (ft, "-") [[1]] [1]
@@ -356,9 +361,10 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
         mod <- summary (stats::lm (yvar ~ flowvars))
         r2out <- r2 [length (r2)] <- mod$r.squared
 
-        message (cli::col_green (cli::symbol$tick),
-                 " R2 = ", signif (r2_out, 4), " for ", cli::col_red (from_out),
-                 " to ", cli::col_red (to_out))
+        message (cli::col_green (cli::symbol$tick), " ",
+                 cli::col_blue (paste0 ("Layer#", ncol (flowvars))),
+                 " : R2 = ", signif (r2_out, 4), " for ",
+                 cli::col_red (from_out), " to ", cli::col_red (to_out))
     } else
         message (cli::col_red (cli::symbol$cross),
                  " No flows make any further significant contributions to model")
