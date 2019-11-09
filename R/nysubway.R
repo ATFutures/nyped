@@ -19,7 +19,31 @@ nysubway_data <- function (quiet = FALSE)
 
     xy <- dl_locations (quiet = quiet)
     x <- match_counts_to_stns (counts, xy)
-    sf::st_as_sf (x, wkt = "geom", crs = 4326)
+    x <- sf::st_as_sf (x, wkt = "geom", crs = 4326)
+
+    exit_map <- stn_to_subway_exits ()
+    # remove stations to which no counts are allocated:
+    exit_map <- exit_map [which (exit_map$stn %in% unique (x$index)), ]
+    # re-allocate (x,y) for stations which have no closest exits back to the
+    # original station coordinates (there are only around 5 of these)
+    x_x <- vapply (x$geom, function (i) i [1], numeric (1))
+    x_y <- vapply (x$geom, function (i) i [2], numeric (1))
+    index <- which (is.na (exit_map$x))
+    exit_map$x [index] <- x_x [exit_map$stn [index]]
+    exit_map$y [index] <- x_y [exit_map$stn [index]]
+
+    # get number of exits for each station
+    stn_counts <- data.frame (stn = x$index,
+                              count = x$count2018)
+    n_exits <- dplyr::left_join (exit_map, stn_counts, by = "stn") %>%
+        dplyr::group_by (stn) %>%
+        dplyr::summarise (n = length (exit))
+    exit_map$n_exits <- n_exits$n [match (exit_map$stn, n_exits$stn)]
+    exit_map$count <- stn_counts$count [match (exit_map$stn, stn_counts$stn)]
+    exit_map$count <- exit_map$count / exit_map$n_exits
+
+    sf::st_as_sf (exit_map [, c ("count", "x", "y")], coords = c ("x", "y"),
+                  crs = 4326)
 }
 
 dl_ridership <- function (quiet = FALSE)
@@ -143,6 +167,65 @@ dl_locations <- function (quiet = FALSE)
     utils::read.csv (f, stringsAsFactors = FALSE)
 }
 
+stn_to_subway_exits <- function ()
+{
+    # match locations to lines:
+    xy <- dl_locations (quiet = TRUE)
+    xy <- sf::st_as_sf (xy, wkt = "the_geom", crs = 4326)
+    xy$x <- vapply (xy$the_geom, function (i) i [1], numeric (1))
+    xy$y <- vapply (xy$the_geom, function (i) i [2], numeric (1))
+    xy_lines <- strsplit (gsub (" Express", "", xy$LINE), "-")
+    xy_lines <- lapply (xy_lines, function (i) unique (i))
+
+    # download entrances and exits
+    f <- file.path (tempdir (), "ny-subway-exits.csv")
+    if (!file.exists (f))
+    {
+        u <- paste0 ("https://data.cityofnewyork.us/api/views/",
+                     "he7q-3hwy/rows.csv?accessType=DOWNLOAD")
+        check <- utils::download.file (url = u, destfile = f, quiet = TRUE)
+    }
+    exits <- read.csv (f, stringsAsFactors = FALSE)
+    exits <- sf::st_as_sf (exits, wkt = "the_geom", crs = 4326)
+    exits$x <- vapply (exits$the_geom, function (i) i [1], numeric (1))
+    exits$y <- vapply (exits$the_geom, function (i) i [2], numeric (1))
+    # one exit has "e" instead of "E", so toupper is needed:
+    exit_lines <- strsplit (toupper (exits$LINE), "-")
+
+    all_lines <- unique (unlist (xy_lines))
+    nearest <- vector ("list", length (all_lines))
+    for (i in seq (all_lines))
+    {
+        stn_index <- which (vapply (xy_lines, function (j)
+                                    all_lines [[i]] %in% j, logical (1)))
+        exit_index <- which (vapply (exit_lines, function (j)
+                                     all_lines [[i]] %in% j, logical (1)))
+
+        xy_stn <- xy [stn_index, c ("x", "y"), drop = TRUE]
+        xy_exit <- exits [exit_index, c ("x", "y"), drop = TRUE]
+        dmat <- geodist::geodist (xy_stn, xy_exit)
+        # nearest station to each exit of that line:
+        stn_index_i <- stn_index [apply (dmat, 2, which.min)]
+        nearest [[i]] <- cbind (stn_index_i, exit_index)
+    }
+    nearest <- data.frame (do.call (rbind, nearest))
+    nearest <- nearest [which (!duplicated (nearest)), ]
+    names (nearest) <- c ("stn", "exit")
+
+    # not all stations have closest exits, so those are subsequent mapped back
+    # on to the station location itself
+    index <- which (!seq (nrow (xy)) %in% sort (unique (nearest$stn)))
+    nearest <- rbind (nearest, data.frame (stn = index,
+                                           exit = rep (NA, length (index))))
+    nearest <- nearest [order (nearest [, 1]), ]
+
+    # finally, append coordinates of exits
+    nearest$x <- exits$x [nearest$exit]
+    nearest$y <- exits$y [nearest$exit]
+
+    return (nearest)
+}
+
 match_counts_to_stns <- function (counts, xy)
 {
     xy$NAME <- gsub("(\\d)(st|nd|rd|th)\\b", "\\1", xy$NAME)
@@ -200,7 +283,7 @@ match_counts_to_stns <- function (counts, xy)
     xy$NAME [grepl ("^57 St", xy$NAME) & xy$LINE == "F"] <- 
         counts$Station [grepl ("^57 St", counts$Station) & counts$ids == "F"] <-
             "57 St F"
-    xy [grepl ("^57 St", xy$NAME), ]
+    #xy [grepl ("^57 St", xy$NAME), ]
     xy$NAME [grepl ("^57 St", xy$NAME) & grepl ("N", xy$LINE)] <- 
         counts$Station [grepl ("^57 St", counts$Station) & counts$ids == "N,Q,R,W"] <-
             "57 St NQRW"
@@ -227,13 +310,6 @@ match_counts_to_stns <- function (counts, xy)
     })
     index <- unname (index)
 
-    length (which (is.na (index))) # 136 -> 111 -> 1
-    index2 <- which (is.na (index))
-    i <- index2 [1]
-    counts$Station [i]
-    xy$NAME [index [i]]
-
-
     data.frame (name = counts$Station,
                 count2013 = counts$X2013,
                 count2014 = counts$X2014,
@@ -241,6 +317,7 @@ match_counts_to_stns <- function (counts, xy)
                 count2016 = counts$X2016,
                 count2017 = counts$X2017,
                 count2018 = counts$X2018,
+                index = index, # index into original xy station file
                 geom = xy$the_geom [index],
                 stringsAsFactors = FALSE)
 }
