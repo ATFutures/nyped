@@ -297,13 +297,17 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
         stats <- apply (dat$flows, 2, function (j) {
                             ivs <- cbind (flowvars, j)
                             mod <- summary (stats::lm (yvar ~ ivs))
+                            tval <- utils::tail (mod$coefficients [, 3], 1)
                             c (sum (mod$residuals ^ 2) / 1e6,
-                               mod$r.squared)  })
-        stats <- t (stats) # then 2 columns of (ss, r2)
+                               mod$r.squared,
+                               tval)  })
+        stats <- t (stats) # then 3 columns of (ss, r2, T-statistic)
+        # Find min eror only for those models with positive T-statistics:
+        ssmin_i <- min (stats [, 1] [stats [, 3] > 0])
         
-        if (min (stats [, 1]) < ssmin)
+        if (ssmin_i < ssmin)
         {
-            i <- which.min (stats [, 1])
+            i <- which (stats [, 1] == ssmin_i)
             ssmin <- stats [i, 1]
             r2_out <- stats [i, 2]
             n_out <- stats$n [i]
