@@ -33,7 +33,8 @@ get_layer_internal <- function (net, from = "subway", to = "disperse", data_dir,
                                 sub_exits = TRUE)
 {
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
-    s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
+    s <- subway_osm_id (data_dir = data_dir, net = net,
+                        sub_exits = sub_exits, quiet = TRUE)
     net <- dodgr::dodgr_contract_graph (net, verts = unique (c (p$id, s$id)))
     v <- dodgr::dodgr_vertices (net)
 
