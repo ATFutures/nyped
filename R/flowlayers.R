@@ -9,8 +9,12 @@
 #' "transportation", or "disperse" for a general dispersal model.
 #' @param data_dir The directory in which data are to be, or have previously
 #' been, downloaded.
+#' @param sub_exits (For flows to/from subway only.) Calculate layer from subway
+#' exits (`TRUE`), or just from single points denoting subway stations
+#' (`FALSE`)?
 #' @export
-get_layer <- function (net, from = "subway", to = "disperse", data_dir)
+get_layer <- function (net, from = "subway", to = "disperse", data_dir,
+                       sub_exits = TRUE)
 {
     f <- file.path (data_dir, "calibration",
                     paste0 ("net-", substr (from, 1, 3), "-",
@@ -18,13 +22,15 @@ get_layer <- function (net, from = "subway", to = "disperse", data_dir)
     net_f <- NULL
     if (!file.exists (f))
     {
-        net_f <- get_layer_internal (net, from = from, to = to, data_dir)
+        net_f <- get_layer_internal (net, from = from, to = to, data_dir,
+                                     sub_exits = sub_exits)
         saveRDS (net_f, file = f)
     }
     return (net_f)
 }
 
-get_layer_internal <- function (net, from = "subway", to = "disperse", data_dir)
+get_layer_internal <- function (net, from = "subway", to = "disperse", data_dir,
+                                sub_exits = TRUE)
 {
     p <- ped_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
     s <- subway_osm_id (data_dir = data_dir, net = net, quiet = TRUE)
@@ -149,7 +155,7 @@ get_res_dat <- function (v, data_dir)
 get_subway_dat <- function (s)
 {
     data.frame (id = s$id,
-                n = s$count2018,
+                n = s$count,
                 stringsAsFactors = FALSE)
 }
 

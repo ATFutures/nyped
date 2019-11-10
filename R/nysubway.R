@@ -2,6 +2,8 @@
 #'
 #' Download, clean, and join New York City subway station counts and coordinates
 #' @param quiet If `FALSE`, display progress information on screen
+#' @param sub_exits Calculate layer from subway exits (`TRUE`), or just from
+#' single points denoting subway stations (`FALSE`)?
 #' @return A `data.frame` of subway names, annual counts, and geographical
 #' coordinates.
 #'
@@ -10,7 +12,7 @@
 #' # library (mapview)
 #' # mapview (dat, cex = "count2018", zcol = "count2018")
 #' @export
-nysubway_data <- function (quiet = FALSE)
+nysubway_data <- function (quiet = FALSE, sub_exits = TRUE)
 {
     dl_ridership (quiet = quiet)
     strip_to_table ()
@@ -21,29 +23,36 @@ nysubway_data <- function (quiet = FALSE)
     x <- match_counts_to_stns (counts, xy)
     x <- sf::st_as_sf (x, wkt = "geom", crs = 4326)
 
-    exit_map <- stn_to_subway_exits ()
-    # remove stations to which no counts are allocated:
-    exit_map <- exit_map [which (exit_map$stn %in% unique (x$index)), ]
-    # re-allocate (x,y) for stations which have no closest exits back to the
-    # original station coordinates (there are only around 5 of these)
-    x_x <- vapply (x$geom, function (i) i [1], numeric (1))
-    x_y <- vapply (x$geom, function (i) i [2], numeric (1))
-    index <- which (is.na (exit_map$x))
-    exit_map$x [index] <- x_x [exit_map$stn [index]]
-    exit_map$y [index] <- x_y [exit_map$stn [index]]
+    if (!sub_exits)
+    {
+        names (x) [which (names (x) == "count2018")] <- "count"
+    } else
+    {
+        exit_map <- stn_to_subway_exits ()
+        # remove stations to which no counts are allocated:
+        exit_map <- exit_map [which (exit_map$stn %in% unique (x$index)), ]
+        # re-allocate (x,y) for stations which have no closest exits back to the
+        # original station coordinates (there are only around 5 of these)
+        x_x <- vapply (x$geom, function (i) i [1], numeric (1))
+        x_y <- vapply (x$geom, function (i) i [2], numeric (1))
+        index <- which (is.na (exit_map$x))
+        exit_map$x [index] <- x_x [exit_map$stn [index]]
+        exit_map$y [index] <- x_y [exit_map$stn [index]]
 
-    # get number of exits for each station
-    stn_counts <- data.frame (stn = x$index,
-                              count = x$count2018)
-    n_exits <- dplyr::left_join (exit_map, stn_counts, by = "stn") %>%
-        dplyr::group_by (stn) %>%
-        dplyr::summarise (n = length (exit))
-    exit_map$n_exits <- n_exits$n [match (exit_map$stn, n_exits$stn)]
-    exit_map$count <- stn_counts$count [match (exit_map$stn, stn_counts$stn)]
-    exit_map$count <- exit_map$count / exit_map$n_exits
+        # get number of exits for each station
+        stn_counts <- data.frame (stn = x$index,
+                                  count = x$count2018)
+        n_exits <- dplyr::left_join (exit_map, stn_counts, by = "stn") %>%
+            dplyr::group_by (stn) %>%
+            dplyr::summarise (n = length (exit))
+        exit_map$n_exits <- n_exits$n [match (exit_map$stn, n_exits$stn)]
+        exit_map$count <- stn_counts$count [match (exit_map$stn, stn_counts$stn)]
+        exit_map$count <- exit_map$count / exit_map$n_exits
 
-    sf::st_as_sf (exit_map [, c ("count", "x", "y")], coords = c ("x", "y"),
-                  crs = 4326)
+        x <- sf::st_as_sf (exit_map [, c ("count", "x", "y")],
+                           coords = c ("x", "y"), crs = 4326)
+    }
+    return (x);
 }
 
 dl_ridership <- function (quiet = FALSE)

@@ -57,13 +57,20 @@ get_ny_network <- function (data_dir)
 #' @param net Weighted street network; loaded from `data_dir` if not provided
 #' @param data_dir The directory in which data are to be, or have previously
 #' been, downloaded.
+#' @param sub_exits Calculate layer from subway exits (`TRUE`), or just from
+#' single points denoting subway stations (`FALSE`)?
 #' @param quiet If `FALSE`, display progress information on screen
 #' @return A `data.frame` of pedestrian counts, associated spatial coordinates,
 #' and OSM IDs of nearest points on network
 #' @export
-subway_osm_id <- function (data_dir, net = NULL, quiet = FALSE)
+subway_osm_id <- function (data_dir, net = NULL, sub_exits = TRUE, quiet = FALSE)
 {
-    f <- file.path (data_dir, "calibration", "sub-osm-id.Rds")
+    f <- file.path (data_dir, "calibration")
+    if (sub_exits)
+        f <- file.path (f, "sub-exit-osm-id.Rds")
+    else
+        f <- file.path (f, "sub-osm-id.Rds")
+
     if (file.exists (f))
         s <- readRDS (f)
     else
@@ -71,7 +78,7 @@ subway_osm_id <- function (data_dir, net = NULL, quiet = FALSE)
         if (is.null (net))
             net <- get_ny_network (data_dir)
 
-        s <- nysubway_data (quiet = quiet)
+        s <- nysubway_data (quiet = quiet, sub_exits = sub_exits)
         s$count <- round (s$count / 365) # convert to daily counts
         sxy <- sf::st_coordinates (s$geom)
         v <- dodgr::dodgr_vertices (net)

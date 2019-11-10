@@ -4,13 +4,16 @@
 \alias{subway_osm_id}
 \title{subway_osm_id}
 \usage{
-subway_osm_id(data_dir, net = NULL, quiet = FALSE)
+subway_osm_id(data_dir, net = NULL, sub_exits = TRUE, quiet = FALSE)
 }
 \arguments{
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
 
 \item{net}{Weighted street network; loaded from `data_dir` if not provided}
+
+\item{sub_exits}{Calculate layer from subway exits (`TRUE`), or just from
+single points denoting subway stations (`FALSE`)?}
 
 \item{quiet}{If `FALSE`, display progress information on screen}
 }

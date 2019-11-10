@@ -4,7 +4,8 @@
 \alias{get_layer}
 \title{get_layer}
 \usage{
-get_layer(net, from = "subway", to = "disperse", data_dir)
+get_layer(net, from = "subway", to = "disperse", data_dir,
+  sub_exits = TRUE)
 }
 \arguments{
 \item{net}{Weighted street network; loaded from `data_dir` if not provided}
@@ -18,6 +19,10 @@ get_layer(net, from = "subway", to = "disperse", data_dir)
 
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
+
+\item{sub_exits}{(For flows to/from subway only.) Calculate layer from subway
+exits (`TRUE`), or just from single points denoting subway stations
+(`FALSE`)?}
 }
 \description{
 Append network with flow columns between nominated places

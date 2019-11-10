@@ -4,10 +4,13 @@
 \alias{nysubway_data}
 \title{nysubway_data}
 \usage{
-nysubway_data(quiet = FALSE)
+nysubway_data(quiet = FALSE, sub_exits = TRUE)
 }
 \arguments{
 \item{quiet}{If `FALSE`, display progress information on screen}
+
+\item{sub_exits}{Calculate layer from subway exits (`TRUE`), or just from
+single points denoting subway stations (`FALSE`)?}
 }
 \value{
 A `data.frame` of subway names, annual counts, and geographical
