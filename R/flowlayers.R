@@ -268,9 +268,11 @@ all_flows_to_ped <- function (data_dir)
 #'
 #' @param dat Output of previous run of `build_ped_model`
 #' @param sig Desired level of statistical significance
+#' @param pos_only Only include layers that make a positive contribution to
+#' final model (and so exclude any layers that are negatively correlated)?
 #' @inheritParams get_layer
 #' @export
-build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
+build_ped_model <- function (data_dir, dat = NULL, sig = 0.01, pos_only = TRUE)
 {
     # dummy-load a network graph to extract pedestrian counts:
     files <- list.files (file.path (data_dir, "calibration"),
@@ -315,7 +317,9 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01)
         if (all (stats [, 3] < 0)) # no positive-correlated layers
             next
 
-        ssmin_i <- min (stats [, 1] [stats [, 3] > 0])
+        ssmin_i <- min (stats [, 1])
+        if (pos_only)
+            ssmin_i <- min (stats [, 1] [stats [, 3] > 0])
         
         if (ssmin_i < ssmin)
         {

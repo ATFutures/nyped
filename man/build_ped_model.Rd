@@ -4,7 +4,7 @@
 \alias{build_ped_model}
 \title{build_ped_model}
 \usage{
-build_ped_model(data_dir, dat = NULL, sig = 0.01)
+build_ped_model(data_dir, dat = NULL, sig = 0.01, pos_only = TRUE)
 }
 \arguments{
 \item{data_dir}{The directory in which data are to be, or have previously
@@ -13,6 +13,9 @@ been, downloaded.}
 \item{dat}{Output of previous run of `build_ped_model`}
 
 \item{sig}{Desired level of statistical significance}
+
+\item{pos_only}{Only include layers that make a positive contribution to
+final model (and so exclude any layers that are negatively correlated)?}
 }
 \description{
 Build final pedestrian model
