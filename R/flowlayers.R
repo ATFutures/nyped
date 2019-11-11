@@ -19,6 +19,8 @@ get_layer <- function (net, from = "subway", to = "disperse", data_dir,
     f <- file.path (data_dir, "calibration",
                     paste0 ("net-", substr (from, 1, 3), "-",
                             substr (to, 1, 3), ".Rds"))
+    if ((from == "subway" | to == "subway") & sub_exits)
+        f <- gsub ("sub", "sub-exits", f)
     net_f <- NULL
     if (!file.exists (f))
     {
@@ -224,7 +226,7 @@ fit_flows_to_ped <- function (net_f, data_dir)
 #'
 #' @inheritParams fit_flows_to_ped
 #' @export
-all_flows_to_ped <- function (data_dir)
+all_flows_to_ped <- function (data_dir, sub_exits = TRUE)
 {
     categories <- c ("subway", "centrality", "residential", "transportation",
                      "sustenance", "entertainment", "education", "healthcare")
@@ -244,11 +246,15 @@ all_flows_to_ped <- function (data_dir)
         f <- file.path (data_dir, "calibration",
                         paste0 ("net-", substring (fi, 1, 3), "-",
                                 substring (ti, 1, 3), ".Rds"))
+        if ((fi == "subway" | ti == "subway") & sub_exits)
+            f <- gsub ("sub", "sub-exits", f)
         if (file.exists (f))
         {
             fout <- file.path (data_dir, "calibration",
                                paste0 ("ped-flows-", substring (fi, 1, 3), "-",
                                        substring (ti, 1, 3), ".Rds"))
+            if ((fi == "subway" | ti == "subway") & sub_exits)
+                fout <- gsub ("sub", "sub-exits", fout)
             if (!file.exists (fout))
             {
                 message (cli::col_cyan (cli::symbol$star), " ", fi, " -> ", ti, ":")
@@ -272,7 +278,8 @@ all_flows_to_ped <- function (data_dir)
 #' final model (and so exclude any layers that are negatively correlated)?
 #' @inheritParams get_layer
 #' @export
-build_ped_model <- function (data_dir, dat = NULL, sig = 0.01, pos_only = TRUE)
+build_ped_model <- function (data_dir, dat = NULL, sig = 0.01, pos_only = TRUE,
+                             sub_exits = TRUE)
 {
     # dummy-load a network graph to extract pedestrian counts:
     files <- list.files (file.path (data_dir, "calibration"),
@@ -284,6 +291,15 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01, pos_only = TRUE)
     # Then loop over the flows as mapped on to those pedestrian counts
     files <- list.files (file.path (data_dir, "calibration"),
                          pattern = "ped-flows-", full.names = TRUE)
+    if (!sub_exits)
+        files <- files [which (!grepl ("-exits", files))]
+    else
+    {
+        sub_files <- files [grep ("sub", files)]
+        not_these <- sub_files [which (!grep ("-exits", sub_files))]
+        files <- files [which (!files %in% not_these)]
+    }
+
     ssmin <- .Machine$double.xmax
     r2 <- from <- to <- flowvars <- n <- k <- NULL
     if (!is.null (dat))
@@ -296,6 +312,8 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01, pos_only = TRUE)
         flowvars <- dat$flowvars
         # and remove those pairs from list of files to be added
         ft <- paste0 (dat$from, "-", dat$to)
+        if (any (grepl ("sub", ft)) & sub_exits)
+            ft <- gsub ("sub", "sub-exits", ft)
         for (f in ft)
             files <- files [!grepl (f, files)]
     }
@@ -330,6 +348,8 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01, pos_only = TRUE)
             k_out <- dat$k [i]
             ft <- strsplit (strsplit (files [f], "ped-flows-") [[1]] [2],
                             ".Rds") [[1]]
+            if (sub_exits)
+                ft <- gsub ("-exits", "", ft)
             from_out <- strsplit (ft, "-") [[1]] [1]
             to_out <- strsplit (ft, "-") [[1]] [2]
             flows <- dat$flows [, which.min (stats [, 1])]
@@ -386,6 +406,7 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01, pos_only = TRUE)
                   to = to,
                   n = n,
                   k = k,
+                  sub_exits = sub_exits,
                   is_significant = is_significant,
                   ped_counts = yvar,
                   flowvars = flowvars))
@@ -450,8 +471,17 @@ calc_layer_scales <- function (mod, data_dir)
 #' @export
 ped_model_to_full_flow <- function (mod, data_dir)
 {
+    from <- mod$from
+    to <- mod$to
+    if (mod$sub_exits)
+    {
+        from [grep ("sub", from)] <- gsub ("sub", "sub-exits",
+                                           from [grep ("sub", from)])
+        to [grep ("sub", to)] <- gsub ("sub", "sub-exits",
+                                       to [grep ("sub", to)])
+    }
     files <- file.path (data_dir, "calibration",
-                        paste0 ("net-", mod$from, "-", mod$to, ".Rds"))
+                        paste0 ("net-", from, "-", to, ".Rds"))
     flows <- NULL
     kvals <- 1:30 * 100
     for (i in seq (files))

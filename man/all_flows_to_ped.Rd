@@ -4,7 +4,7 @@
 \alias{all_flows_to_ped}
 \title{all_flows_to_ped}
 \usage{
-all_flows_to_ped(data_dir)
+all_flows_to_ped(data_dir, sub_exits = TRUE)
 }
 \arguments{
 \item{data_dir}{The directory in which data are to be, or have previously
