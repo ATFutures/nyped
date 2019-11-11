@@ -224,7 +224,7 @@ fit_flows_to_ped <- function (net_f, data_dir)
 #' Batch-convert all flow layers to equivalent values matched to pedestrian
 #' counting stations via the \link{fit_flows_to_ped} function.
 #'
-#' @inheritParams fit_flows_to_ped
+#' @inheritParams get_layer
 #' @export
 all_flows_to_ped <- function (data_dir, sub_exits = TRUE)
 {
@@ -471,6 +471,8 @@ calc_layer_scales <- function (mod, data_dir)
 #' @export
 ped_model_to_full_flow <- function (mod, data_dir)
 {
+    net0 <- readRDS (file.path (data_dir, "calibration", "net-reference.Rds"))
+
     from <- mod$from
     to <- mod$to
     if (mod$sub_exits)

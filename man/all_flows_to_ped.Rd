@@ -9,6 +9,10 @@ all_flows_to_ped(data_dir, sub_exits = TRUE)
 \arguments{
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
+
+\item{sub_exits}{(For flows to/from subway only.) Calculate layer from subway
+exits (`TRUE`), or just from single points denoting subway stations
+(`FALSE`)?}
 }
 \description{
 Batch-convert all flow layers to equivalent values matched to pedestrian
