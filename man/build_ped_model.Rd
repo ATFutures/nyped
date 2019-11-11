@@ -4,8 +4,7 @@
 \alias{build_ped_model}
 \title{build_ped_model}
 \usage{
-build_ped_model(data_dir, dat = NULL, sig = 0.01, pos_only = TRUE,
-  sub_exits = TRUE)
+build_ped_model(data_dir, dat = NULL, sig = 0.01, pos_only = TRUE)
 }
 \arguments{
 \item{data_dir}{The directory in which data are to be, or have previously
@@ -17,10 +16,6 @@ been, downloaded.}
 
 \item{pos_only}{Only include layers that make a positive contribution to
 final model (and so exclude any layers that are negatively correlated)?}
-
-\item{sub_exits}{(For flows to/from subway only.) Calculate layer from subway
-exits (`TRUE`), or just from single points denoting subway stations
-(`FALSE`)?}
 }
 \description{
 Build final pedestrian model
