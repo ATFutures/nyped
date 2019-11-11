@@ -194,7 +194,7 @@ stn_to_subway_exits <- function ()
                      "he7q-3hwy/rows.csv?accessType=DOWNLOAD")
         check <- utils::download.file (url = u, destfile = f, quiet = TRUE)
     }
-    exits <- read.csv (f, stringsAsFactors = FALSE)
+    exits <- utils::read.csv (f, stringsAsFactors = FALSE)
     exits <- sf::st_as_sf (exits, wkt = "the_geom", crs = 4326)
     exits$x <- vapply (exits$the_geom, function (i) i [1], numeric (1))
     exits$y <- vapply (exits$the_geom, function (i) i [2], numeric (1))
@@ -224,6 +224,7 @@ stn_to_subway_exits <- function ()
     # not all stations have closest exits, so those are subsequent mapped back
     # on to the station location itself
     index <- which (!seq (nrow (xy)) %in% sort (unique (nearest$stn)))
+    stn <- exit <- NULL # suppress no visible binding notes
     nearest <- rbind (nearest, data.frame (stn = index,
                                            exit = rep (NA, length (index))))
     nearest <- nearest [order (nearest [, 1]), ]

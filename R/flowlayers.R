@@ -413,7 +413,7 @@ build_ped_model <- function (data_dir, dat = NULL, sig = 0.01, pos_only = TRUE)
 calc_layer_scales <- function (mod, data_dir)
 {
     f_ <- mod$flowvars # put as separate variable because print method uses full name
-    lmod <- summary (lm (dat$ped_counts ~ f_))
+    lmod <- summary (stats::lm (dat$ped_counts ~ f_))
     estimates <- lmod$coefficients [2:nrow (lmod$coefficients), 1]
 
     f <- ped_model_to_full_flow (mod, data_dir)
