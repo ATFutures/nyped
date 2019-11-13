@@ -173,24 +173,36 @@ fit_flows_to_ped <- function (net_f, data_dir)
     index1 <- t (apply (dp_verts, 1, function (i) match (i, net_f$.vx1)))
 
     flowmat <- as.matrix (net_f [, fcols])
-    n <- 1:20
-    pb <- utils::txtProgressBar (style = 3)
-    temp <- list ()
-    for (i in seq (n))
+    index <- which (colSums (flowmat) > 0)
+    k <- n <- flows <- NA
+    if (length (index) == 0)
     {
-        temp [[i]] <- rcpp_match_flow_mats (flowmat, index0 - 1, index1 - 1,
-                                            fcols - 1, n [i])
-        utils::setTxtProgressBar (pb, i / length (n))
+        message (cli::col_red (cli::symbol$cross, 
+                               " Flow layer has no non-zero values"))
+    } else
+    {
+        n <- 1:20
+        pb <- utils::txtProgressBar (style = 3)
+        temp <- list ()
+        for (i in seq (n))
+        {
+            temp [[i]] <- rcpp_match_flow_mats (flowmat, index0 - 1, index1 - 1,
+                                                fcols - 1, n [i])
+            utils::setTxtProgressBar (pb, i / length (n))
+        }
+        close (pb)
+
+        temp <- do.call (cbind, temp)
+
+        if (max (temp) > 0)
+        {
+            k <- 1:30 * 100
+            nk <- length (k) # 30
+            n <- 1:20
+            k <- rep (k, length (n))
+            n <- rep (n, each = nk)
+        }
     }
-    close (pb)
-
-    temp <- do.call (cbind, temp)
-
-    k <- 1:30 * 100
-    nk <- length (k) # 30
-    n <- 1:20
-    k <- rep (k, length (n))
-    n <- rep (n, each = nk)
 
     list (k = k, n = n, flows = temp)
 }
@@ -233,9 +245,14 @@ all_flows_to_ped <- function (data_dir)
                          fi, " -> ", ti, ":")
                 net_f <- readRDS (f)
                 flows <- fit_flows_to_ped (net_f, data_dir)
-                saveRDS (flows, file = fout)
-                message ("\r", cli::col_green (cli::symbol$tick),
-                         " ", fi, " -> ", ti, "\n")
+                if (length (flows$flows) > 0)
+                {
+                    saveRDS (flows, file = fout)
+                    message ("\r", cli::col_green (cli::symbol$tick),
+                             " ", fi, " -> ", ti, "\n")
+                } else
+                    message ("\r", cli::col_red (cli::symbol$cross),
+                             " ", fi, " -> ", ti, "\n")
             }
         }
     }
