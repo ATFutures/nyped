@@ -200,6 +200,7 @@ get_attractor_layer <- function (data_dir, v, type = "education")
         {
             names (a) [which (names (a) == "centrality")] <- "n"
             a <- a [which (is.finite (a$n)), ]
+            a <- a [which (a$n > 0), ]
             a$n <- a$n / max (a$n)
         } else
         {
