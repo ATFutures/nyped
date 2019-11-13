@@ -39,29 +39,7 @@ get_layer_internal <- function (net, from = "subway", to = "disperse", data_dir)
     ks <- 0
     k <- 1:30 * 100
 
-    # get fr_dat with columns of (id, n), where id is matched to v$id
-    reverse <- FALSE
-    if (from == "centrality")
-    {
-        net <- reverse_net (net)
-        reverse <- TRUE
-        from <- to
-        to <- "centrality"
-        if (from == "subway")
-            fr_dat <- get_subway_dat (s)
-        else
-            fr_dat <- get_attractor_layer (data_dir, v, type = from)
-    } else if (from == "residential" & to != "centrality")
-    {
-        net <- reverse_net (net)
-        reverse <- TRUE
-        from <- to
-        to <- "residential"
-        if (from == "subway")
-            fr_dat <- get_subway_dat (s)
-        else
-            fr_dat <- get_attractor_layer (data_dir, v, type = from)
-    } else if (from == "subway")
+    if (from == "subway")
         fr_dat <- get_subway_dat (s)
     else
         fr_dat <- get_attractor_layer (data_dir, v, type = from)
@@ -104,9 +82,6 @@ get_layer_internal <- function (net, from = "subway", to = "disperse", data_dir)
         message ("\r", cli::col_green (cli::symbol$tick),
                  " Aggregated layer in ", ti)
     }
-
-    if (reverse)
-        net_f <- reverse_net (net_f)
 
     return (net_f)
 }

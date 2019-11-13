@@ -1,6 +1,6 @@
 Package: calibration
 Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.014
+Version: 0.0.0.015
 Authors@R: 
     person(given = "Mark",
            family = "Padgham",
