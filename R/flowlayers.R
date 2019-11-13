@@ -229,7 +229,8 @@ all_flows_to_ped <- function (data_dir)
                                        substring (ti, 1, 3), ".Rds"))
             if (!file.exists (fout))
             {
-                message (cli::col_cyan (cli::symbol$star), " ", fi, " -> ", ti, ":")
+                message (cli::col_cyan (cli::symbol$star), " ",
+                         fi, " -> ", ti, ":")
                 net_f <- readRDS (f)
                 flows <- fit_flows_to_ped (net_f, data_dir)
                 saveRDS (flows, file = fout)
@@ -238,6 +239,23 @@ all_flows_to_ped <- function (data_dir)
             }
         }
     }
+
+    # plus centrality to pedestrian stations
+    f <- file.path (data_dir, "ny-centrality-edge.Rds")
+    if (file.exists (f))
+    {
+        # called cen-cen to conform with expected names in building final model
+        fout <- file.path (data_dir, "calibration", "ped-flows-cen-cen.Rds")
+        if (!file.exists (fout))
+        {
+            message (cli::col_cyan (cli::symbol$star), " centrality:")
+            net_f <- readRDS (f)
+            flows <- fit_flows_to_ped (net_f, data_dir)
+            saveRDS (flows, file = fout)
+            message ("\r", cli::col_green (cli::symbol$tick), " centrality \n")
+        }
+    }
+
 }
 
 #' build_ped_model
