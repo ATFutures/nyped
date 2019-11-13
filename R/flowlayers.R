@@ -166,7 +166,9 @@ fit_flows_to_ped <- function (net_f, data_dir)
         return (res)
     }
     dp_verts <- sorted_verts (dp)
-    # then convert that to equivalent indices into both .vx0 and .vx1 of net_f
+    # then convert that to equivalent indices into both .vx0 and .vx1 of net_f,
+    # so index0 is a matrix with one row for each ped station, and columns
+    # containing indices into .vx0 of net_f in increasing order of distance.
     index0 <- t (apply (dp_verts, 1, function (i) match (i, net_f$.vx0)))
     index1 <- t (apply (dp_verts, 1, function (i) match (i, net_f$.vx1)))
 
