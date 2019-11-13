@@ -174,7 +174,8 @@ fit_flows_to_ped <- function (net_f, data_dir)
 
     flowmat <- as.matrix (net_f [, fcols])
     index <- which (colSums (flowmat) > 0)
-    k <- n <- flows <- NA
+    k <- n <- NA
+    temp <- list ()
     if (length (index) == 0)
     {
         message (cli::col_red (cli::symbol$cross, 
@@ -183,7 +184,6 @@ fit_flows_to_ped <- function (net_f, data_dir)
     {
         n <- 1:20
         pb <- utils::txtProgressBar (style = 3)
-        temp <- list ()
         for (i in seq (n))
         {
             temp [[i]] <- rcpp_match_flow_mats (flowmat, index0 - 1, index1 - 1,
