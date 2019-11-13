@@ -154,6 +154,8 @@ get_attractor_layer <- function (data_dir, v, type = "education")
     if (type == "centrality")
     {
         a <- readRDS (file.path (data_dir, "ny-centrality-vertex.Rds"))
+        # 5 centrality values are negative for some reason:
+        a$centrality [a$centrality < 0] <- 0
         a$category <- "centrality"
     } else
         a <- readRDS (file.path (data_dir, "osm", "ny-attractors.Rds"))
