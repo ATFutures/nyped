@@ -47,7 +47,10 @@ get_layer_internal <- function (net, from = "subway", to = "disperse", data_dir)
         reverse <- TRUE
         from <- to
         to <- "centrality"
-        fr_dat <- get_attractor_layer (data_dir, v, type = from)
+        if (from == "subway")
+            fr_dat <- get_subway_dat (s)
+        else
+            fr_dat <- get_attractor_layer (data_dir, v, type = from)
     } else if (from == "residential" & to != "centrality")
     {
         net <- reverse_net (net)
@@ -84,6 +87,11 @@ get_layer_internal <- function (net, from = "subway", to = "disperse", data_dir)
             to_dat <- get_subway_dat (s)
         else
             to_dat <- get_attractor_layer (data_dir, v, type = to)
+
+        if (any (is.na (fr_dat$n)))
+            stop ("From-data contains NA values")
+        if (any (is.na (to_dat$n)))
+            stop ("To-data contains NA values")
 
         message (cli::col_cyan (cli::symbol$star), " Aggregating layer ... ",
                  appendLF = FALSE)
