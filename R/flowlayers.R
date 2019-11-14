@@ -41,6 +41,8 @@ get_layer_internal <- function (net, from = "subway", to = "disperse", data_dir)
 
     if (from == "subway")
         fr_dat <- get_subway_dat (s)
+    else if (from == "residential")
+        fr_dat <- get_res_dat (v, data_dir)
     else
         fr_dat <- get_attractor_layer (data_dir, v, type = from)
 
