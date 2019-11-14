@@ -39,6 +39,8 @@ nysubway_data <- function (quiet = FALSE, sub_exits = TRUE)
         exit_map$x [index] <- x_x [exit_map$stn [index]]
         exit_map$y [index] <- x_y [exit_map$stn [index]]
 
+        # suppress no visible binding notes:
+        stn <- exit <- NULL
         # get number of exits for each station
         stn_counts <- data.frame (stn = x$index,
                                   count = x$count2018)
