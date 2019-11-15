@@ -264,9 +264,9 @@ ped_model_to_full_flow <- function (mod, data_dir)
                         paste0 ("net-", from, "-", to, ".Rds"))
     flows <- NULL
     kvals <- 1:30 * 100
-    pb <- utils::txtProgressBar (style = 3)
     message (cli::col_green (cli::symbol$pointer,
              " Extracting final layers from full network:"))
+    pb <- utils::txtProgressBar (style = 3)
     for (i in seq (files))
     {
         x <- readRDS (files [i])
