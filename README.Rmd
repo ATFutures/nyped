@@ -13,17 +13,12 @@ knitr::opts_chunk$set(
 )
 ```
 
-[![Build Status](https://travis-ci.org/moveability/calibration.svg)](https://travis-ci.org/moveability/calibration) 
+[![Build Status](https://travis-ci.org/ATFutures/nyped.svg)](https://travis-ci.org/ATFutures/nyped) 
 [![Project Status: Concept - Minimal or no implementation has been done yet.](http://www.repostatus.org/badges/0.1.0/concept.svg)](http://www.repostatus.org/#concept)
 
-# calibration
+# nyped
 
-<!-- badges: start -->
-[![Travis build status](https://travis-ci.org/moveability/calibration.svg?branch=master)](https://travis-ci.org/moveability/calibration)
-<!-- badges: end -->
-
-Calibration of [moveability](https://github.com/moveability/moveability) model
-of pedestrian flows against empirical [pedestrian counts for New York
+Model of pedestrian flows against empirical [pedestrian counts for New York
 City](https://www1.nyc.gov/html/dot/html/about/datafeeds.shtml#Pedestrians).
 
 Final result looks like this:
