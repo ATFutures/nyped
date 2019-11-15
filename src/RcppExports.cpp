@@ -7,7 +7,7 @@ using namespace Rcpp;
 
 // rcpp_match_flow_mats
 Rcpp::NumericMatrix rcpp_match_flow_mats(Rcpp::NumericMatrix flows, Rcpp::IntegerMatrix index0, Rcpp::IntegerMatrix index1, Rcpp::IntegerVector fcols, const int n);
-RcppExport SEXP _calibration_rcpp_match_flow_mats(SEXP flowsSEXP, SEXP index0SEXP, SEXP index1SEXP, SEXP fcolsSEXP, SEXP nSEXP) {
+RcppExport SEXP _nyped_rcpp_match_flow_mats(SEXP flowsSEXP, SEXP index0SEXP, SEXP index1SEXP, SEXP fcolsSEXP, SEXP nSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -22,11 +22,11 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_calibration_rcpp_match_flow_mats", (DL_FUNC) &_calibration_rcpp_match_flow_mats, 5},
+    {"_nyped_rcpp_match_flow_mats", (DL_FUNC) &_nyped_rcpp_match_flow_mats, 5},
     {NULL, NULL, 0}
 };
 
-RcppExport void R_init_calibration(DllInfo *dll) {
+RcppExport void R_init_nyped(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }

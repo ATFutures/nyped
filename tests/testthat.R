@@ -1,4 +1,4 @@
 library(testthat)
-library(calibration)
+library(nyped)
 
-test_check("calibration")
+test_check("nyped")

@@ -5,6 +5,6 @@
 #'
 #' @noRd
 rcpp_match_flow_mats <- function(flows, index0, index1, fcols, n) {
-    .Call(`_calibration_rcpp_match_flow_mats`, flows, index0, index1, fcols, n)
+    .Call(`_nyped_rcpp_match_flow_mats`, flows, index0, index1, fcols, n)
 }
 

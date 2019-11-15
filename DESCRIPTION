@@ -1,5 +1,5 @@
-Package: calibration
-Title: What the Package Does (One Line, Title Case)
+Package: nyped
+Title: Model of pedestrian flows throughout New York City
 Version: 0.0.0.017
 Authors@R: 
     person(given = "Mark",
@@ -7,7 +7,7 @@ Authors@R:
            role = c("aut", "cre"),
            email = "mark.padgham@email.com",
            comment = c(ORCID = "0000-0003-2172-5265"))
-Description: What the package does (one paragraph).
+Description: Model of pedestrian flows throughout New York City.
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
@@ -32,6 +32,6 @@ Suggests:
 LinkingTo:
     Rcpp
 NeedsCompilation: yes
-URL: https://github.com/moveability/calibration
-BugReports: https://github.com/moveability/calibration/issues
+URL: https://github.com/ATFutures/nyped
+BugReports: https://github.com/ATFutures/nyped/issues
 RoxygenNote: 7.0.0
