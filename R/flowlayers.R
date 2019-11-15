@@ -90,7 +90,7 @@ get_layer_internal <- function (net, from = "subway", to = "disperse", data_dir)
 
 # return all pairwise combinations of flow layer categories, removing any that
 # have already been calculated
-from_to_pairs <- function ()
+from_to_pairs <- function (data_dir)
 {
     categories <- c ("subway", "centrality", "residential", "transportation",
                      "sustenance", "entertainment", "education", "healthcare")
