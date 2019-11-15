@@ -4,19 +4,30 @@
 \alias{build_ped_model}
 \title{build_ped_model}
 \usage{
-build_ped_model(data_dir, dat = NULL, sig = 0.01, pos_only = TRUE)
+build_ped_model(data_dir, sig_build = 0.05, sig_model = 0.01, pos_only = FALSE)
 }
 \arguments{
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
 
-\item{dat}{Output of previous run of `build_ped_model`}
+\item{sig_build}{Significance threshold for initial constructing of model
+through adding successive layers}
 
-\item{sig}{Desired level of statistical significance}
+\item{sig_model}{Desired significance of final model}
 
 \item{pos_only}{Only include layers that make a positive contribution to
 final model (and so exclude any layers that are negatively correlated)?}
 }
+\value{
+The final model reduced to only layers with significance below
+`sig_model`.
+}
 \description{
-Build final pedestrian model
+build_ped_model
+}
+\note{
+This function can take several minutes to run, and saves the final
+model in two forms, both stored in `data_dir`: the initial, full model with
+all layers, called 'ped-model-full.Rds', and the final model with only layers
+with significance below `sig_model`, called `ped-model-final.Rds`.
 }

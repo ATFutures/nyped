@@ -88,6 +88,39 @@ get_layer_internal <- function (net, from = "subway", to = "disperse", data_dir)
     return (net_f)
 }
 
+# return all pairwise combinations of flow layer categories, removing any that
+# have already been calculated
+from_to_pairs <- function ()
+{
+    categories <- c ("subway", "centrality", "residential", "transportation",
+                     "sustenance", "entertainment", "education", "healthcare")
+    ft <- data.frame (from = categories,
+                      to = "disperse",
+                      stringsAsFactors = FALSE)
+    index <- t (utils::combn (length (categories), 2))
+    ft <- rbind (ft,
+                 data.frame (from = c (categories [index [, 1]],
+                                       categories [index [, 2]]),
+                             to = c (categories [index [, 2]],
+                                     categories [index [, 1]]),
+                             stringsAsFactors = FALSE))
+
+    ftout <- NULL
+    for (i in seq (nrow (ft)))
+    {
+        f <- file.path (data_dir, "calibration",
+                        paste0 ("net-", substr (ft$from [i], 1, 3), "-",
+                                substr (ft$to [i], 1, 3), ".Rds"))
+        if (!file.exists (f))
+            ftout <- rbind (ftout, c (ft$from [i], ft$to [i]))
+    }
+    ft <- data.frame (from = ftout [, 1],
+                      to = ftout [, 2],
+                      stringsAsFactors = FALSE)
+
+    return (ft)
+}
+
 
 
 reverse_net <- function (net)

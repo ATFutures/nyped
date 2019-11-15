@@ -1,6 +1,6 @@
 Package: calibration
 Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.016
+Version: 0.0.0.017
 Authors@R: 
     person(given = "Mark",
            family = "Padgham",
@@ -34,4 +34,4 @@ LinkingTo:
 NeedsCompilation: yes
 URL: https://github.com/moveability/calibration
 BugReports: https://github.com/moveability/calibration/issues
-RoxygenNote: 6.1.1
+RoxygenNote: 7.0.0

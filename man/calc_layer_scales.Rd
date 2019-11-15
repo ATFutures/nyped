@@ -4,14 +4,15 @@
 \alias{calc_layer_scales}
 \title{calc_layer_scales}
 \usage{
-calc_layer_scales(mod, data_dir)
+calc_layer_scales(data_dir, model = "final")
 }
 \arguments{
-\item{mod}{A final pedestrian model produced by successive calls to
-\link{build_ped_model}}
-
 \item{data_dir}{The directory in which data are to be, or have previously
 been, downloaded.}
+
+\item{model}{Default "final" uses the final model of layers reduced only to
+those with significance less than `sig_model` in \link{build_ped_model},
+otherwise the full model with potentially less significant layers is used.}
 }
 \value{
 A `data.frame` with six columns of (1) 'model' with the layer names;
