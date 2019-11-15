@@ -44,4 +44,7 @@ f_ <- dat$flowvars
 summary (lm (dat$p ~ f_))
 ```
 
+The final flow model looks like this:
+
+![](./man/figures/flowmap.png)
 
