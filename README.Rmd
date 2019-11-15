@@ -1,5 +1,5 @@
 ---
-output: github_document
+output: gfm
 ---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
@@ -25,4 +25,23 @@ knitr::opts_chunk$set(
 Calibration of [moveability](https://github.com/moveability/moveability) model
 of pedestrian flows against empirical [pedestrian counts for New York
 City](https://www1.nyc.gov/html/dot/html/about/datafeeds.shtml#Pedestrians).
+
+Final result looks like this:
+```{r load, echo = FALSE}
+devtools::load_all (".", export_all = FALSE)
+data_dir <- "/data/data/moveability/nyc"
+```
+
+```{r layer-scales}
+x <- calc_layer_scales (data_dir, model = "final")
+knitr::kable (x)
+```
+
+With the following model statistics:
+```{r model-stats}
+dat <- readRDS (file.path (data_dir, "ped-model-final.Rds"))
+f_ <- dat$flowvars
+summary (lm (dat$p ~ f_))
+```
+
 
