@@ -28,6 +28,8 @@ City](https://www1.nyc.gov/html/dot/html/about/datafeeds.shtml#Pedestrians).
 
 Final result looks like this:
 ```{r load, echo = FALSE}
+library (ggplot2)
+theme_set (theme_minimal ())
 devtools::load_all (".", export_all = FALSE)
 data_dir <- "/data/data/moveability/nyc"
 ```
@@ -48,3 +50,15 @@ The final flow model looks like this:
 
 ![](./man/figures/flowmap.png)
 
+And a final statistical relationship between modelled and observed pedestrian
+counts that looks like this:
+```{r model-plot}
+data_dir <- "/data/data/moveability/nyc"
+dat <- readRDS (file.path (data_dir, "ped-model-final.Rds"))
+mod <- lm (dat$p ~ dat$flowvars)
+res <- data.frame (predicted = predict (mod),
+                   actual = dat$p)
+ggplot (res, aes (x = predicted, y = actual)) +
+    geom_point () +
+    geom_smooth (method = "lm")
+```
