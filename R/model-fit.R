@@ -258,6 +258,16 @@ calc_layer_scales <- function (data_dir, model = "final")
 #' @export
 ped_model_to_full_flow <- function (mod, data_dir)
 {
+    f <- file.path (data_dir, "ped-model-final.Rds")
+    if (!file.exists (f))
+        stop ("Final model file [", f, "] not found; ",
+              "have you run 'build_ped_model'?")
+
+    dat <- readRDS (f)
+    stopifnot (ncol (dat$flowvars) == length (mod$from))
+    lmod <- summary (stats::lm (dat$ped_counts ~ dat$flowvars))
+    estimates <- as.numeric (lmod$coefficients [2:nrow (lmod$coefficients), 1])
+
     from <- mod$from
     to <- mod$to
     files <- file.path (data_dir, "calibration",
@@ -271,7 +281,7 @@ ped_model_to_full_flow <- function (mod, data_dir)
     {
         x <- readRDS (files [i])
         nf <- which (kvals == mod$k [i])
-        flows <- cbind (flows, x [[paste0 ("flow", nf)]])
+        flows <- cbind (flows, x [[paste0 ("flow", nf)]] * estimates [i])
         utils::setTxtProgressBar (pb, i / length (files))
     }
     close (pb)
