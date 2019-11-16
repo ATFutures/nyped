@@ -22,8 +22,8 @@ knitr::opts_chunk$set(
 suppressPackageStartupMessages ({
     library (dplyr)
     library (ggplot2)
+    devtools::load_all (".", export_all = FALSE, quiet = TRUE)
 })
-devtools::load_all (".", export_all = FALSE, quiet = TRUE)
 theme_set (theme_minimal ())
 data_dir <- "/data/data/moveability/nyc"
 ```

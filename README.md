@@ -7,12 +7,6 @@ yet.](http://www.repostatus.org/badges/0.1.0/concept.svg)](http://www.repostatus
 
 # nyped
 
-    #> 
-    #> Attaching package: 'testthat'
-    #> The following object is masked from 'package:dplyr':
-    #> 
-    #>     matches
-
 Model of pedestrian flows against empirical [pedestrian counts for New
 York
 City](https://www1.nyc.gov/html/dot/html/about/datafeeds.shtml#Pedestrians),
