@@ -22,8 +22,8 @@ knitr::opts_chunk$set(
 suppressPackageStartupMessages ({
     library (dplyr)
     library (ggplot2)
-    devtools::load_all (".", export_all = FALSE)
 })
+devtools::load_all (".", export_all = FALSE, quiet = TRUE)
 theme_set (theme_minimal ())
 data_dir <- "/data/data/moveability/nyc"
 ```
@@ -40,7 +40,7 @@ following seven categories of origins and destinations:
 6. education
 7. healthcare
 
-```{r model-stats1}
+```{r model-stats1, echo = FALSE}
 dat <- readRDS (file.path (data_dir, "ped-model-final.Rds"))
 f_ <- dat$flowvars
 mod <- summary (lm (dat$p ~ f_))

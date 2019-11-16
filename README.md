@@ -7,7 +7,11 @@ yet.](http://www.repostatus.org/badges/0.1.0/concept.svg)](http://www.repostatus
 
 # nyped
 
-    #> Loading nyped
+    #> 
+    #> Attaching package: 'testthat'
+    #> The following object is masked from 'package:dplyr':
+    #> 
+    #>     matches
 
 Model of pedestrian flows against empirical [pedestrian counts for New
 York
@@ -22,15 +26,6 @@ the following seven categories of origins and destinations:
 5.  entertainment
 6.  education
 7.  healthcare
-
-<!-- end list -->
-
-``` r
-dat <- readRDS (file.path (data_dir, "ped-model-final.Rds"))
-f_ <- dat$flowvars
-mod <- summary (lm (dat$p ~ f_))
-r2 <- signif (100 * mod$adj.r.squared, 3)
-```
 
 An eighth category is network centrality, with additional layers
 modelling dispersal from each of these categories. The model explains
