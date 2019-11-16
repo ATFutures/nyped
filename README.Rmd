@@ -18,35 +18,68 @@ knitr::opts_chunk$set(
 
 # nyped
 
-Model of pedestrian flows against empirical [pedestrian counts for New York
-City](https://www1.nyc.gov/html/dot/html/about/datafeeds.shtml#Pedestrians).
-
-Final result looks like this:
 ```{r load, echo = FALSE}
-library (ggplot2)
+suppressPackageStartupMessages ({
+    library (dplyr)
+    library (ggplot2)
+    devtools::load_all (".", export_all = FALSE)
+})
 theme_set (theme_minimal ())
-devtools::load_all (".", export_all = FALSE)
 data_dir <- "/data/data/moveability/nyc"
 ```
+Model of pedestrian flows against empirical [pedestrian counts for New York
+City](https://www1.nyc.gov/html/dot/html/about/datafeeds.shtml#Pedestrians),
+constructed from "flow layers" formed from pair-wise matching between the
+following seven categories of origins and destinations:
 
-```{r layer-scales}
-x <- calc_layer_scales (data_dir, model = "final")
-knitr::kable (x)
+1. subway
+2. residential
+3. transportation
+4. sustenance
+5. entertainment
+6. education
+7. healthcare
+
+```{r model-stats1}
+dat <- readRDS (file.path (data_dir, "ped-model-final.Rds"))
+f_ <- dat$flowvars
+mod <- summary (lm (dat$p ~ f_))
+r2 <- signif (100 * mod$adj.r.squared, 3)
 ```
+An eighth category is network centrality, with additional layers modelling
+dispersal from each of these categories. The model explains R<sup>2</sup>=
+`r r2` of the observed variation in pedestrian counts. Final result looks like
+this:
 
-With the following model statistics:
+
 ```{r model-stats}
 dat <- readRDS (file.path (data_dir, "ped-model-final.Rds"))
 f_ <- dat$flowvars
-summary (lm (dat$p ~ f_))
+mod <- summary (lm (dat$p ~ f_))
+coeffs <- data.frame (mod$coefficients [2:nrow (mod$coefficients), ])
+# for some reason, colnames do not transfer properly:
+names (coeffs) <- colnames (mod$coefficients)
+coeffs <- cbind ("Layer Name" = gsub ("f_", "", rownames (coeffs)),
+                 coeffs)
+# Next line is critical, because the vertical lines are interpreted by markdown
+# as table column breaks, which mucks the whole thing up!
+names (coeffs) [length (names (coeffs))] <- "Pr(>t)"
+# order by origin, then by decreasing absolute T value
+coeffs$origin <- substr (coeffs$`Layer Name`, 1, 3)
+names (coeffs) [which (names (coeffs) == "t value")] <- "t"
+coeffs <- arrange (coeffs, origin, desc (t))
+rownames (coeffs) <- NULL
+coeffs$origin <- NULL
+names (coeffs) [which (names (coeffs) == "t")] <- "t value"
+knitr::kable (coeffs, digits = c (NA, 0, 0, 2, 4), row.names = FALSE, caption = "Table 1. Statistical parameters of final model of pedestrian flows through New York City. (Placeholder only in rendered version)")
 ```
 
-The final flow model looks like this:
+A sample of actual flows looks like this:
 
 ![](./man/figures/flowmap.png)
 
 And a final statistical relationship between modelled and observed pedestrian
-counts that looks like this:
+counts looks like this:
 ```{r model-plot}
 data_dir <- "/data/data/moveability/nyc"
 dat <- readRDS (file.path (data_dir, "ped-model-final.Rds"))
