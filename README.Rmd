@@ -48,8 +48,9 @@ r2 <- signif (100 * mod$adj.r.squared, 3)
 ```
 An eighth category is network centrality, with additional layers modelling
 dispersal from each of these categories. The model explains R<sup>2</sup>=
-`r r2` of the observed variation in pedestrian counts. Final result looks like
-this:
+`r r2` of the observed variation in pedestrian counts. Final results, with
+significantly explanatory layers named according to the first three letters of
+the above layers, looks like this:
 
 
 ```{r model-stats, echo = FALSE}
@@ -71,7 +72,7 @@ coeffs <- arrange (coeffs, origin, desc (t))
 rownames (coeffs) <- NULL
 coeffs$origin <- NULL
 names (coeffs) [which (names (coeffs) == "t")] <- "t value"
-knitr::kable (coeffs, digits = c (NA, 0, 0, 2, 4), row.names = FALSE, caption = "Table 1. Statistical parameters of final model of pedestrian flows through New York City. (Placeholder only in rendered version)")
+knitr::kable (coeffs, digits = c (NA, 0, 0, 2, 4), row.names = FALSE, caption = "Table 1. Statistical parameters of final model of pedestrian flows through New York City.")
 ```
 
 A sample of actual flows looks like this:

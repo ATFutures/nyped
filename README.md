@@ -24,7 +24,8 @@ the following seven categories of origins and destinations:
 An eighth category is network centrality, with additional layers
 modelling dispersal from each of these categories. The model explains
 R<sup>2</sup>= 83.9 of the observed variation in pedestrian counts.
-Final result looks like this:
+Final results, with significantly explanatory layers named according to
+the first three letters of the above layers, looks like this:
 
 | Layer Name | Estimate | Std. Error | t value | Pr(\>t) |
 | :--------- | -------: | ---------: | ------: | ------: |
@@ -44,7 +45,7 @@ Final result looks like this:
 | sus-edu    |   \-5924 |        978 |  \-6.06 |  0.0000 |
 
 Table 1. Statistical parameters of final model of pedestrian flows
-through New York City. (Placeholder only in rendered version)
+through New York City.
 
 A sample of actual flows looks like this:
 
