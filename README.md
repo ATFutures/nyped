@@ -26,28 +26,6 @@ modelling dispersal from each of these categories. The model explains
 R<sup>2</sup>= 83.9 of the observed variation in pedestrian counts.
 Final result looks like this:
 
-``` r
-dat <- readRDS (file.path (data_dir, "ped-model-final.Rds"))
-f_ <- dat$flowvars
-mod <- summary (lm (dat$p ~ f_))
-coeffs <- data.frame (mod$coefficients [2:nrow (mod$coefficients), ])
-# for some reason, colnames do not transfer properly:
-names (coeffs) <- colnames (mod$coefficients)
-coeffs <- cbind ("Layer Name" = gsub ("f_", "", rownames (coeffs)),
-                 coeffs)
-# Next line is critical, because the vertical lines are interpreted by markdown
-# as table column breaks, which mucks the whole thing up!
-names (coeffs) [length (names (coeffs))] <- "Pr(>t)"
-# order by origin, then by decreasing absolute T value
-coeffs$origin <- substr (coeffs$`Layer Name`, 1, 3)
-names (coeffs) [which (names (coeffs) == "t value")] <- "t"
-coeffs <- arrange (coeffs, origin, desc (t))
-rownames (coeffs) <- NULL
-coeffs$origin <- NULL
-names (coeffs) [which (names (coeffs) == "t")] <- "t value"
-knitr::kable (coeffs, digits = c (NA, 0, 0, 2, 4), row.names = FALSE, caption = "Table 1. Statistical parameters of final model of pedestrian flows through New York City. (Placeholder only in rendered version)")
-```
-
 | Layer Name | Estimate | Std. Error | t value | Pr(\>t) |
 | :--------- | -------: | ---------: | ------: | ------: |
 | edu-tra    |    23977 |       4484 |    5.35 |  0.0000 |
@@ -74,16 +52,4 @@ A sample of actual flows looks like this:
 
 And a final statistical relationship between modelled and observed
 pedestrian counts looks like this:
-
-``` r
-data_dir <- "/data/data/moveability/nyc"
-dat <- readRDS (file.path (data_dir, "ped-model-final.Rds"))
-mod <- lm (dat$p ~ dat$flowvars)
-res <- data.frame (predicted = predict (mod),
-                   actual = dat$p)
-ggplot (res, aes (x = predicted, y = actual)) +
-    geom_point () +
-    geom_smooth (method = "lm")
-```
-
 <img src="man/figures/README-model-plot-1.png" width="100%" />

@@ -52,7 +52,7 @@ dispersal from each of these categories. The model explains R<sup>2</sup>=
 this:
 
 
-```{r model-stats}
+```{r model-stats, echo = FALSE}
 dat <- readRDS (file.path (data_dir, "ped-model-final.Rds"))
 f_ <- dat$flowvars
 mod <- summary (lm (dat$p ~ f_))
@@ -80,7 +80,7 @@ A sample of actual flows looks like this:
 
 And a final statistical relationship between modelled and observed pedestrian
 counts looks like this:
-```{r model-plot}
+```{r model-plot, echo = FALSE}
 data_dir <- "/data/data/moveability/nyc"
 dat <- readRDS (file.path (data_dir, "ped-model-final.Rds"))
 mod <- lm (dat$p ~ dat$flowvars)
