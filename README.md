@@ -25,7 +25,7 @@ An eighth category is network centrality, with additional layers
 modelling dispersal from each of these categories. The model explains
 R<sup>2</sup>= 83.9 of the observed variation in pedestrian counts.
 Final results, with significantly explanatory layers named according to
-the first three letters of the above layers, looks like this:
+the first three letters of the above categories, looks like this:
 
 | Layer Name | Estimate | Std. Error | t value | Pr(\>t) |
 | :--------- | -------: | ---------: | ------: | ------: |

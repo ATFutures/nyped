@@ -50,7 +50,7 @@ An eighth category is network centrality, with additional layers modelling
 dispersal from each of these categories. The model explains R<sup>2</sup>=
 `r r2` of the observed variation in pedestrian counts. Final results, with
 significantly explanatory layers named according to the first three letters of
-the above layers, looks like this:
+the above categories, looks like this:
 
 
 ```{r model-stats, echo = FALSE}
