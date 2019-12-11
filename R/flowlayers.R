@@ -20,7 +20,9 @@ get_layer <- function (net, from = "subway", to = "disperse", data_dir)
     {
         net_f <- get_layer_internal (net, from = from, to = to, data_dir)
         saveRDS (net_f, file = f)
-    }
+    } else
+        net_f <- readRDS (f)
+
     return (net_f)
 }
 
