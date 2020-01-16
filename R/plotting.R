@@ -53,6 +53,5 @@ plot_subway_counts <- function (year = 2018L)
         stop ("year must be a single value in [2013:2018]")
 
     x <- nysubway_data ()
-    ycol <- paste0 ("count", year)
-    mapview::mapview (x, cex = ycol, zcol = ycol)
+    mapview::mapview (x, cex = "count", zcol = "count")
 }
